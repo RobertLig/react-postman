@@ -35,7 +35,7 @@ function GoogleLogin() {
 
     return (
         <div>
-            <h2>Google Login Test</h2>
+            <h2>Sign in with Google</h2>
             <div id="googleSignInButton"></div>
         </div>
     );

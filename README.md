@@ -1,70 +1,58 @@
-# Getting Started with Create React App
+# Wayline frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Wayline is a React interface for the Quarkus API in `../quarkus-demo/myapp`.
+It supports email and Google sign-in, email verification and password reset,
+browsing/searching routes, route and profile photo uploads, route management,
+direct messages with attachments/reactions/live updates, member block controls,
+and a role-gated support inbox for administrators.
 
-## Available Scripts
+## Run locally
 
-In the project directory, you can run:
+```sh
+npm install
+npm start
+```
 
-### `npm start`
+The frontend expects the API at `http://localhost:8080` by default. Override
+this for a different API origin with a local `.env` file:
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+```env
+REACT_APP_API_URL=http://localhost:8080
+REACT_APP_GOOGLE_CLIENT_ID=your-google-web-client-id
+```
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+The Google client ID defaults to the one configured by the development API.
+The API must allow the frontend origin through its CORS configuration. For
+local development, start Quarkus with `./mvnw quarkus:dev` from the API
+project; its dev profile allows `http://localhost:3000`.
 
-### `npm test`
+The route-posting form accepts city names and coordinates because the API
+requires latitude and longitude for both ends of a route. Those coordinates
+can be looked up with a map service.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Uploads use the API's short-lived signed S3 URLs. Route photos and avatars are
+JPG/PNG images up to 5 MB; each route allows three photos. Message attachments
+are limited to 5 MB and the MIME types allowed by the API, with up to ten
+attachments per message. The S3 bucket must allow browser `PUT` requests from
+the frontend origin.
 
-### `npm run build`
+The access token is kept in tab-scoped session storage. Expired API requests
+attempt the API refresh-cookie flow once, then return the user to sign-in if
+the refresh cookie is unavailable or invalid. Role-gated controls are only a
+convenience; the Quarkus API remains responsible for authorization.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+The API currently hardcodes email links to `yourdomain.com` for verification
+and password reset. Configure those backend links to the deployed frontend
+origin before using those flows outside local testing.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## Scripts
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+- `npm start` starts the development server.
+- `npm test -- --watchAll=false` runs the frontend tests once.
+- `npm run build` creates the production build in the ignored `build/` folder.
 
-### `npm run eject`
+## Styling
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+The interface uses the requested OKLCH design tokens and regular CSS; Tailwind
+CSS is not installed or required. `.env` files, dependencies, build output,
+coverage reports, and IDE project files are excluded by `.gitignore`.
