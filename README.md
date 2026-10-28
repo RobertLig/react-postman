@@ -4,7 +4,9 @@ Wayline is a React interface for the Quarkus API in `../quarkus-demo/myapp`.
 It supports email and Google sign-in, email verification and password reset,
 browsing/searching routes, route and profile photo uploads, route management,
 direct messages with attachments/reactions/live updates, member block controls,
-and a role-gated support inbox for administrators.
+and a role-gated support inbox for administrators. Profile phone numbers use a
+country-aware input and are saved in international format; the initial country
+comes from the browser locale.
 
 ## Run locally
 
@@ -41,9 +43,10 @@ attempt the API refresh-cookie flow once, then return the user to sign-in if
 the refresh cookie is unavailable or invalid. Role-gated controls are only a
 convenience; the Quarkus API remains responsible for authorization.
 
-The API currently hardcodes email links to `yourdomain.com` for verification
-and password reset. Configure those backend links to the deployed frontend
-origin before using those flows outside local testing.
+In dev/test, the API links verification and password-reset emails to
+`http://localhost:3000`. For production, set `FRONTEND_BASE_URL` in the API
+environment to the public frontend origin (for example,
+`https://app.example.com`).
 
 ## Scripts
 

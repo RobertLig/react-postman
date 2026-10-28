@@ -1,4 +1,4 @@
-.app-shell { min-height: 100vh; overflow: hidden; }
+.app-shell { min-height: 100vh; overflow-x: clip; }
 .topbar { height: 82px; max-width: 1280px; margin: auto; padding: 0 42px; display: flex; align-items: center; justify-content: space-between; gap: 30px; border-bottom: 1px solid rgba(31, 57, 78, .08); }
 .brand, .footer-brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); font: 800 22px/1 "Manrope", sans-serif; letter-spacing: -1.2px; white-space: nowrap; }
 .brand-mark { width: 35px; height: 35px; display: grid; place-items: center; border-radius: 12px; color: #fff; background: var(--color-primary); box-shadow: 0 7px 16px rgba(27, 105, 208, .21); }
@@ -254,7 +254,19 @@ h1, h2, h3, p { margin-top: 0; }
 .profile-identity p { margin: 0; color: #849199; font-size: 10px; }
 .profile-form { max-width: 450px; display: grid; gap: 14px; padding-top: 21px; }
 .profile-form > label { display: grid; gap: 6px; color: #455e6e; font-size: 10px; font-weight: 700; }
-.profile-form input { width: 100%; min-height: 42px; padding: 0 12px; border: 1px solid #dfe7e9; border-radius: 7px; color: #253e50; background: #fff; font-size: 11px; font-weight: 400; }
+.profile-optional-field { display: grid; gap: 6px; }
+.profile-field-heading { display: flex; align-items: center; justify-content: space-between; }
+.profile-field-heading label { color: #455e6e; font-size: 10px; font-weight: 700; }
+.profile-field-reset { padding: 2px 0; border: 0; color: #437f86; background: transparent; cursor: pointer; font-size: 9px; font-weight: 700; }
+.profile-field-reset:disabled { cursor: default; opacity: .55; }
+.profile-form input, .profile-form select { width: 100%; min-height: 42px; padding: 0 12px; border: 1px solid #dfe7e9; border-radius: 7px; color: #253e50; background: #fff; font-size: 11px; font-weight: 400; }
+.profile-form .react-tel-input { width: 100%; font-family: inherit; }
+.profile-form .react-tel-input .form-control { width: 100%; height: 42px; padding-left: 52px; border-color: #dfe7e9; border-radius: 7px; color: #253e50; font-family: inherit; font-size: 11px; font-weight: 400; }
+.profile-form .react-tel-input .form-control:focus { border-color: #437f86; box-shadow: 0 0 0 2px rgba(67, 127, 134, .12); }
+.profile-form .react-tel-input .flag-dropdown { border-color: #dfe7e9; border-radius: 7px 0 0 7px; background: #fff; }
+.profile-form .react-tel-input .flag-dropdown.open, .profile-form .react-tel-input .flag-dropdown:hover { background: #f7faf9; }
+.profile-form .react-tel-input .selected-flag { width: 48px; border-radius: 7px 0 0 7px; }
+.profile-form .react-tel-input .country-list { z-index: 20; max-width: min(300px, calc(100vw - 64px)); font-size: 11px; }
 .optional-label { color: #9aa5aa; font-size: 9px; font-weight: 400; }
 .profile-actions { display: flex; align-items: center; gap: 18px; margin-top: 4px; }
 .signout-button { display: inline-flex; align-items: center; gap: 7px; padding: 9px; border: 0; color: #a25a4a; background: transparent; cursor: pointer; font-size: 10px; font-weight: 600; }

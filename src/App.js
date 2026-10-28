@@ -8,12 +8,29 @@ import {
   clearSession,
   uploadFile,
 } from "./api";
+import PhoneInput from "react-phone-input-2";
+import "react-phone-input-2/lib/style.css";
 import "./App.css";
 
 const GOOGLE_CLIENT_ID =
   process.env.REACT_APP_GOOGLE_CLIENT_ID ||
   "456614025207-m4ljumnedhiku3qo8t2fgci9r02ukoci.apps.googleusercontent.com";
 let verificationTokenInProgress = "";
+
+function getDefaultPhoneCountry() {
+  try {
+    const region = new Intl.Locale(navigator.language || "en-US").region;
+    return region && /^[A-Z]{2}$/i.test(region) ? region.toLowerCase() : "us";
+  } catch {
+    return "us";
+  }
+}
+
+function toInternationalPhone(value, dialCode) {
+  const digits = value.replace(/\D/g, "");
+  if (!digits || (dialCode && digits === dialCode)) return null;
+  return `+${digits}`;
+}
 
 function Icon({ name, size = 20 }) {
   const paths = {
@@ -707,11 +724,36 @@ function AnnouncementCard({ announcement, index, onOpen }) {
 function ProfilePage({ token, user, onSave, onSignOut, onDeleteAccount, onRequireAuth }) {
   const [name, setName] = useState(user?.name || "");
   const [email, setEmail] = useState(user?.email || "");
+  const [ageRange, setAgeRange] = useState(user?.ageRange || "");
+  const [gender, setGender] = useState(user?.gender || "");
+  const [phone, setPhone] = useState(user?.phone || "");
+  const [phoneCountry, setPhoneCountry] = useState(getDefaultPhoneCountry);
+  const [phoneDialCode, setPhoneDialCode] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
+
+  useEffect(() => {
+    setName(user?.name || "");
+    setEmail(user?.email || "");
+    setAgeRange(user?.ageRange || "");
+    setGender(user?.gender || "");
+    setPhone(user?.phone || "");
+  }, [user]);
+
+  const handlePhoneChange = (value, country) => {
+    setPhone(value);
+    if (country?.countryCode) setPhoneCountry(country.countryCode);
+    if (country?.dialCode) setPhoneDialCode(country.dialCode);
+  };
+
+  const handlePhoneMount = (value, country) => {
+    if (country?.countryCode) setPhoneCountry(country.countryCode);
+    if (country?.dialCode) setPhoneDialCode(country.dialCode);
+    if (user?.phone && !user.phone.startsWith("+")) setPhone(value);
+  };
 
   if (!token || !user) return <main className="post-page"><div className="post-auth"><span className="empty-icon"><Icon name="user" size={25} /></span><h1>Your Wayline starts here.</h1><p>Sign in to see and update your account details.</p><button className="dialog-primary" onClick={onRequireAuth}>Continue to sign in <Icon name="arrow" size={17} /></button></div></main>;
 
@@ -726,6 +768,9 @@ function ProfilePage({ token, user, onSave, onSignOut, onDeleteAccount, onRequir
         body: {
           name,
           email,
+          ageRange: ageRange || null,
+          gender: gender || null,
+          phone: toInternationalPhone(phone, phoneDialCode),
           locale: navigator.language?.toLowerCase().startsWith("pl") ? "pl" : "en",
           ...(password ? { password } : {}),
         },
@@ -801,6 +846,46 @@ function ProfilePage({ token, user, onSave, onSignOut, onDeleteAccount, onRequir
       <form className="profile-form" onSubmit={submit}>
         <label>Full name<input required value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" /></label>
         <label>Email address<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" /></label>
+        <div className="profile-optional-field">
+          <div className="profile-field-heading"><label htmlFor="profile-age-range">Age range <span className="optional-label">optional</span></label><button type="button" className="profile-field-reset" aria-label="Clear age range" disabled={busy} onClick={() => setAgeRange("")}>Clear</button></div>
+          <select id="profile-age-range" value={ageRange} onChange={(event) => setAgeRange(event.target.value)}>
+          <option value="">Not specified</option>
+          <option value="UNDER_19">Under 19</option>
+          <option value="RANGE_20_29">20-29</option>
+          <option value="RANGE_30_39">30-39</option>
+          <option value="RANGE_40_49">40-49</option>
+          <option value="RANGE_50_59">50-59</option>
+          <option value="RANGE_60_69">60-69</option>
+          <option value="RANGE_70_79">70-79</option>
+          <option value="RANGE_80_89">80-89</option>
+          <option value="OVER_90">90 or older</option>
+          </select>
+        </div>
+        <div className="profile-optional-field">
+          <div className="profile-field-heading"><label htmlFor="profile-gender">Gender <span className="optional-label">optional</span></label><button type="button" className="profile-field-reset" aria-label="Clear gender" disabled={busy} onClick={() => setGender("")}>Clear</button></div>
+          <select id="profile-gender" value={gender} onChange={(event) => setGender(event.target.value)}>
+          <option value="">Prefer not to say</option>
+          <option value="MALE">Male</option>
+          <option value="FEMALE">Female</option>
+          </select>
+        </div>
+        <div className="profile-optional-field">
+          <div className="profile-field-heading"><label htmlFor="profile-phone">Phone number <span className="optional-label">optional</span></label><button type="button" className="profile-field-reset" aria-label="Clear phone number" disabled={busy} onClick={() => setPhone("")}>Clear</button></div>
+          <PhoneInput
+            country={phoneCountry}
+            value={phone}
+            onChange={handlePhoneChange}
+            onMount={handlePhoneMount}
+            enableSearch
+            countryCodeEditable={false}
+            specialLabel=""
+            inputProps={{ id: "profile-phone", name: "phone", autoComplete: "tel" }}
+            containerClass="profile-phone-input"
+            inputClass="profile-phone-control"
+            buttonClass="profile-phone-country"
+            dropdownClass="profile-phone-country-list"
+          />
+        </div>
         <label>New password <span className="optional-label">optional</span><input type="password" minLength="8" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" placeholder="Leave blank to keep your password" /></label>
         {error && <div className="form-error" role="alert">{error}</div>}
         <div className="profile-actions"><button className="dialog-primary" disabled={busy || deleteBusy}>{busy ? "Saving..." : "Save changes"}<Icon name="check" size={16} /></button><button type="button" className="signout-button" onClick={onSignOut}><Icon name="logout" size={16} />Sign out</button></div>

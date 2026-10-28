@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import App from "./App";
 
 beforeEach(() => {
@@ -52,4 +53,84 @@ test("opens the account dialog from the header", async () => {
   expect(screen.getByRole("dialog", { name: "Welcome back." })).toBeInTheDocument();
   expect(screen.getByLabelText("Email address")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Forgot your password?" })).toBeInTheDocument();
+});
+
+test("clears optional profile fields and sends null values to the API", async () => {
+  window.sessionStorage.setItem("wayline.accessToken", "test-token");
+  window.fetch.mockImplementation(async (url, options = {}) => {
+    const body = url.includes("/users/me")
+      ? {
+          id: 3,
+          name: "Taylor Traveler",
+          email: "taylor@example.com",
+          ageRange: "RANGE_30_39",
+          gender: "FEMALE",
+          phone: "+123456789",
+        }
+      : {
+          items: [],
+          totalItems: 0,
+        };
+    return {
+      ok: true,
+      text: async () => JSON.stringify(body),
+    };
+  });
+
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: /Taylor Traveler/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Clear age range" }));
+  fireEvent.click(screen.getByRole("button", { name: "Clear gender" }));
+  fireEvent.click(screen.getByRole("button", { name: "Clear phone number" }));
+  fireEvent.click(screen.getByRole("button", { name: /Save changes/ }));
+
+  await waitFor(() => {
+    const update = window.fetch.mock.calls.find(
+      ([url, options]) => url.includes("/users/me") && options.method === "PUT",
+    );
+    expect(update).toBeDefined();
+    expect(JSON.parse(update[1].body)).toEqual(expect.objectContaining({
+      ageRange: null,
+      gender: null,
+      phone: null,
+    }));
+  });
+});
+
+test("defaults country from locale, allows changing country, and saves international format", async () => {
+  Object.defineProperty(window.navigator, "language", {
+    configurable: true,
+    value: "en-GB",
+  });
+  window.sessionStorage.setItem("wayline.accessToken", "test-token");
+  window.fetch.mockImplementation(async (url) => ({
+    ok: true,
+    text: async () => JSON.stringify(url.includes("/users/me")
+      ? { id: 3, name: "Taylor Traveler", email: "taylor@example.com" }
+      : { items: [], totalItems: 0 }),
+  }));
+
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: /Taylor Traveler/ }));
+
+  expect(document.querySelector(".selected-flag")).toHaveAttribute(
+    "title",
+    "United Kingdom: + 44",
+  );
+  fireEvent.click(document.querySelector(".selected-flag"));
+  fireEvent.click(await screen.findByText("Germany"));
+  expect(document.querySelector(".selected-flag")).toHaveAttribute(
+    "title",
+    "Germany: + 49",
+  );
+  await userEvent.type(screen.getByLabelText(/Phone number/), "301234567");
+  fireEvent.click(screen.getByRole("button", { name: /Save changes/ }));
+
+  await waitFor(() => {
+    const update = window.fetch.mock.calls.find(
+      ([url, options]) => url.includes("/users/me") && options.method === "PUT",
+    );
+    expect(update).toBeDefined();
+    expect(JSON.parse(update[1].body).phone).toBe("+49301234567");
+  });
 });
