@@ -255,8 +255,7 @@ h1, h2, h3, p { margin-top: 0; }
 .remove-stop { width: 31px; height: 39px; display: grid; place-items: center; border: 0; color: #9c6558; background: transparent; cursor: pointer; }
 .photo-picker { margin-top: 2px; }
 .selected-files { display: grid; gap: 6px; margin-top: 10px; }
-.selected-files > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 6px; color: #607681; background: #f4f8f8; font-size: 9px; }
-.selected-files .selected-photo { justify-content: flex-start; }
+.selected-files .selected-photo { display: flex; align-items: center; justify-content: flex-start; gap: 8px; padding: 8px 10px; border-radius: 6px; color: #607681; background: #f4f8f8; font-size: 9px; }
 .selected-photo > img { width: 52px; height: 45px; flex: 0 0 auto; border-radius: 4px; object-fit: cover; background: #e6eeee; }
 .selected-files .selected-photo > span { display: flex; align-items: center; gap: 7px; min-width: 0; flex: 1; }
 .selected-files small { color: #94a1a5; }

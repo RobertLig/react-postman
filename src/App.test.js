@@ -96,17 +96,23 @@ test("previews selected route photos and releases previews when removed", async 
   fireEvent.click(await screen.findByRole("button", { name: /Post an ad/ }));
   fireEvent.click(screen.getByRole("button", { name: /I need a parcel delivered/ }));
   const photo = new File(["photo"], "parcel.png", { type: "image/png" });
-  fireEvent.change(screen.getByLabelText("Add route photos"), { target: { files: [photo] } });
+  const secondPhoto = new File(["photo 2"], "parcel-2.png", { type: "image/png" });
+  const picker = screen.getByLabelText("Add route photos");
+  fireEvent.change(picker, { target: { files: [photo] } });
+  fireEvent.change(picker, { target: { files: [secondPhoto] } });
 
   expect(screen.getByRole("img", { name: "Preview of parcel.png" })).toHaveAttribute("src", "blob:route-photo-preview");
-  fireEvent.click(screen.getByRole("button", { name: "Remove parcel.png" }));
-  expect(screen.queryByRole("img", { name: "Preview of parcel.png" })).not.toBeInTheDocument();
-  expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:route-photo-preview");
-
-  const secondPhoto = new File(["photo 2"], "parcel-2.png", { type: "image/png" });
-  fireEvent.change(screen.getByLabelText("Add route photos"), { target: { files: [secondPhoto] } });
-  unmount();
+  fireEvent.click(screen.getByRole("button", { name: "Move photo 2 up" }));
+  expect(screen.getAllByRole("img").map((image) => image.getAttribute("alt"))).toEqual([
+    "Preview of parcel-2.png",
+    "Preview of parcel.png",
+  ]);
+  fireEvent.click(screen.getByRole("button", { name: "Remove parcel-2.png" }));
+  expect(screen.queryByRole("img", { name: "Preview of parcel-2.png" })).not.toBeInTheDocument();
   expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:route-photo-preview-2");
+
+  unmount();
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:route-photo-preview");
   URL.createObjectURL = originalCreateObjectURL;
   URL.revokeObjectURL = originalRevokeObjectURL;
 });

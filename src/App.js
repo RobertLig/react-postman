@@ -1162,6 +1162,7 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
   const [stops, setStops] = useState([]);
   const [photos, setPhotos] = useState([]);
   const photoPreviewUrls = useRef(new Map());
+  const nextPhotoId = useRef(1);
   const nextStopId = useRef(1);
   const reverseGeocodeController = useRef(null);
 
@@ -1392,17 +1393,31 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
               const previews = selected.map((file) => {
                 const previewUrl = URL.createObjectURL(file);
                 photoPreviewUrls.current.set(file, previewUrl);
-                return { file, previewUrl };
+                return { id: `photo-${nextPhotoId.current++}`, file, previewUrl };
               });
               setPhotos((current) => [...current, ...previews]);
             }
             event.target.value = "";
           }} /></label>
-          {photos.length > 0 && <div className="selected-files">{photos.map(({ file, previewUrl }, index) => <div className="selected-photo" key={`${file.name}-${file.lastModified}-${index}`}><img src={previewUrl} alt={`Preview of ${file.name}`} /><span><Icon name="box" size={15} />{file.name}<small>{(file.size / (1024 * 1024)).toFixed(1)} MB</small></span><button type="button" aria-label={`Remove ${file.name}`} onClick={() => {
-            URL.revokeObjectURL(previewUrl);
-            photoPreviewUrls.current.delete(file);
-            setPhotos((current) => current.filter((_, photoIndex) => photoIndex !== index));
-          }}><Icon name="close" size={15} /></button></div>)}</div>}
+          {photos.length > 0 && <div className="selected-files">
+            <SortableList
+              items={photos}
+              onChange={setPhotos}
+              itemLabel="photo"
+              listLabel="Photos in upload order"
+              renderItem={({ file, previewUrl, id }) => (
+                <div className="selected-photo">
+                  <img src={previewUrl} alt={`Preview of ${file.name}`} />
+                  <span><Icon name="box" size={15} />{file.name}<small>{(file.size / (1024 * 1024)).toFixed(1)} MB</small></span>
+                  <button type="button" aria-label={`Remove ${file.name}`} onClick={() => {
+                    URL.revokeObjectURL(previewUrl);
+                    photoPreviewUrls.current.delete(file);
+                    setPhotos((current) => current.filter((photo) => photo.id !== id));
+                  }}><Icon name="close" size={15} /></button>
+                </div>
+              )}
+            />
+          </div>}
         </div>}
         {error && <div className="form-error" role="alert">{error}</div>}
         <div className="post-submit"><span><Icon name="check" size={16} />Your contact details stay private.</span><button className="dialog-primary" disabled={busy}>{busy ? "Publishing..." : "Publish ad"}<Icon name="arrow" size={17} /></button></div>
