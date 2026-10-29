@@ -15,6 +15,7 @@ import LocationAutocomplete from "./LocationAutocomplete";
 import LocationMap from "./LocationMap";
 import SortableList from "./SortableList";
 import { reverseGeocodeLocation } from "./geocoding";
+import { getMeasurementSystem } from "./measurement";
 
 const GOOGLE_CLIENT_ID =
   process.env.REACT_APP_GOOGLE_CLIENT_ID ||
@@ -1148,6 +1149,7 @@ function AuthDialog({ initialMode, resetToken, onClose, onAuthenticated, onNotic
 
 function PostRoute({ token, user, onRequireAuth, onPosted }) {
   const [form, setForm] = useState({ type: "courier", title: "", description: "", postingPlace: "", receptionPlace: "", postingDateTime: "", receptionDateTime: "" });
+  const [measurementSystem] = useState(getMeasurementSystem);
   const [locations, setLocations] = useState({ origin: null, destination: null });
   const [activeLocationKey, setActiveLocationKey] = useState("origin");
   const [error, setError] = useState("");
@@ -1244,13 +1246,13 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
       postingDateTime: form.postingDateTime,
       receptionDateTime: form.receptionDateTime,
       translations: [{ language: navigator.language?.toLowerCase().startsWith("pl") ? "pl" : "en", title: form.title, description: form.description }],
-      ...(includeWeight && weight ? { weight: { value: Number(weight), unit: "metric" } } : {}),
+      ...(includeWeight && weight ? { weight: { value: Number(weight), unit: measurementSystem } } : {}),
       ...(includeDimensions ? {
         dimensions: {
           width: Number(dimensions.width),
           height: Number(dimensions.height),
           length: Number(dimensions.length),
-          unit: "metric",
+          unit: measurementSystem,
         },
       } : {}),
       ...(stops.length ? {
@@ -1343,10 +1345,10 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
         <div className="form-section"><h2>A few more details</h2><div className="form-grid">
           <label className="full-span">Give your route a title<input required maxLength={150} value={form.title} onChange={(event) => update("title", event.target.value)} placeholder="A short, friendly headline" /></label>
           <label className="full-span">Anything else people should know?<textarea rows="4" maxLength={2000} value={form.description} onChange={(event) => update("description", event.target.value)} placeholder="Share a little more about the journey..." /></label>
-        </div><label className="terms-field weight-toggle"><input type="checkbox" checked={includeWeight} onChange={(event) => setIncludeWeight(event.target.checked)} /><span>I can share a weight limit</span></label>{includeWeight && <label className="weight-input">Maximum weight (kg)<input type="number" min="0.1" step="0.1" value={weight} onChange={(event) => setWeight(event.target.value)} placeholder="e.g. 10" /></label>}</div>
+        </div><label className="terms-field weight-toggle"><input type="checkbox" checked={includeWeight} onChange={(event) => setIncludeWeight(event.target.checked)} /><span>I can share a weight limit</span></label>{includeWeight && <label className="weight-input">Maximum weight ({measurementSystem === "imperial" ? "lb" : "kg"})<input type="number" min="0.1" step="0.1" value={weight} onChange={(event) => setWeight(event.target.value)} placeholder={measurementSystem === "imperial" ? "e.g. 22" : "e.g. 10"} /></label>}</div>
         <div className="form-section"><h2>Stops and parcel details</h2>
           <label className="terms-field weight-toggle"><input type="checkbox" checked={includeDimensions} onChange={(event) => setIncludeDimensions(event.target.checked)} /><span>I can share maximum parcel dimensions</span></label>
-          {includeDimensions && <div className="form-grid dimensions-fields"><label>Width (cm)<input type="number" min="0.1" step="0.1" required value={dimensions.width} onChange={(event) => setDimensions({ ...dimensions, width: event.target.value })} /></label><label>Height (cm)<input type="number" min="0.1" step="0.1" required value={dimensions.height} onChange={(event) => setDimensions({ ...dimensions, height: event.target.value })} /></label><label>Length (cm)<input type="number" min="0.1" step="0.1" required value={dimensions.length} onChange={(event) => setDimensions({ ...dimensions, length: event.target.value })} /></label></div>}
+          {includeDimensions && <div className="form-grid dimensions-fields"><label>Width ({measurementSystem === "imperial" ? "in" : "cm"})<input type="number" min="0.1" step="0.1" required value={dimensions.width} onChange={(event) => setDimensions({ ...dimensions, width: event.target.value })} /></label><label>Height ({measurementSystem === "imperial" ? "in" : "cm"})<input type="number" min="0.1" step="0.1" required value={dimensions.height} onChange={(event) => setDimensions({ ...dimensions, height: event.target.value })} /></label><label>Length ({measurementSystem === "imperial" ? "in" : "cm"})<input type="number" min="0.1" step="0.1" required value={dimensions.length} onChange={(event) => setDimensions({ ...dimensions, length: event.target.value })} /></label></div>}
           <div className="stops-heading"><p>Add optional pickup or meeting points; use the arrows to set their order.</p><button type="button" className="outline-button" disabled={stops.length >= 5} onClick={() => {
             const id = `stop-${nextStopId.current++}`;
             setStops((current) => [...current, { id, address: "", location: null }]);

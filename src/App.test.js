@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import L from "leaflet";
 import App from "./App";
+import { getMeasurementSystem } from "./measurement";
 
 beforeEach(() => {
   window.fetch = jest.fn().mockResolvedValue({
@@ -149,6 +150,13 @@ test("selects geocoded cities and stops without exposing coordinate inputs", asy
   polyline.mockRestore();
   L.Browser.svg = supportsSvg;
   expect(screen.queryByLabelText(/latitude|longitude/i)).not.toBeInTheDocument();
+  const measurementSystem = getMeasurementSystem(navigator.language);
+  fireEvent.click(screen.getByRole("checkbox", { name: "I can share a weight limit" }));
+  await userEvent.type(screen.getByLabelText(`Maximum weight (${measurementSystem === "imperial" ? "lb" : "kg"})`), "10");
+  fireEvent.click(screen.getByRole("checkbox", { name: "I can share maximum parcel dimensions" }));
+  await userEvent.type(screen.getByLabelText(`Width (${measurementSystem === "imperial" ? "in" : "cm"})`), "10");
+  await userEvent.type(screen.getByLabelText(`Height (${measurementSystem === "imperial" ? "in" : "cm"})`), "20");
+  await userEvent.type(screen.getByLabelText(`Length (${measurementSystem === "imperial" ? "in" : "cm"})`), "30");
   await userEvent.type(screen.getByLabelText("Give your route a title"), "Berlin parcel trip");
   fireEvent.change(screen.getByLabelText("Leaving"), { target: { value: "2026-10-30T10:00" } });
   fireEvent.change(screen.getByLabelText("Arriving by"), { target: { value: "2026-10-30T15:00" } });
@@ -166,6 +174,13 @@ test("selects geocoded cities and stops without exposing coordinate inputs", asy
       receptionPlace: "Prague, Czechia",
       receptionLatitude: 50.0755,
       receptionLongitude: 14.4378,
+      weight: { value: 10, unit: measurementSystem },
+      dimensions: {
+        width: 10,
+        height: 20,
+        length: 30,
+        unit: measurementSystem,
+      },
       stops: [
         { address: "Leipzig, Germany", latitude: 51.3397, longitude: 12.3731, position: 0 },
         { address: "Dresden, Germany", latitude: 51.0504, longitude: 13.7373, position: 1 },

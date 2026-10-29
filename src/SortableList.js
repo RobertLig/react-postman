@@ -3,7 +3,7 @@ export default function SortableList({
   onChange,
   itemLabel,
   listLabel,
-  getItemKey,
+  getItemKey = (item) => item.id,
   renderItem,
 }) {
   const moveItem = (index, offset) => {
