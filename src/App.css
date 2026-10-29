@@ -256,7 +256,9 @@ h1, h2, h3, p { margin-top: 0; }
 .photo-picker { margin-top: 2px; }
 .selected-files { display: grid; gap: 6px; margin-top: 10px; }
 .selected-files > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 6px; color: #607681; background: #f4f8f8; font-size: 9px; }
-.selected-files > div > span { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.selected-files .selected-photo { justify-content: flex-start; }
+.selected-photo > img { width: 52px; height: 45px; flex: 0 0 auto; border-radius: 4px; object-fit: cover; background: #e6eeee; }
+.selected-files .selected-photo > span { display: flex; align-items: center; gap: 7px; min-width: 0; flex: 1; }
 .selected-files small { color: #94a1a5; }
 .selected-files button { display: grid; place-items: center; border: 0; color: #9c6558; background: transparent; cursor: pointer; }
 .post-submit { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 19px; border-top: 1px solid #edf0f1; }

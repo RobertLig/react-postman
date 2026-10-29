@@ -1161,10 +1161,14 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
   const [dimensions, setDimensions] = useState({ width: "", height: "", length: "" });
   const [stops, setStops] = useState([]);
   const [photos, setPhotos] = useState([]);
+  const photoPreviewUrls = useRef(new Map());
   const nextStopId = useRef(1);
   const reverseGeocodeController = useRef(null);
 
-  useEffect(() => () => reverseGeocodeController.current?.abort(), []);
+  useEffect(() => () => {
+    reverseGeocodeController.current?.abort();
+    photoPreviewUrls.current.forEach((url) => URL.revokeObjectURL(url));
+  }, []);
 
   if (!token || !user) return <main className="post-page"><div className="post-auth"><span className="empty-icon"><Icon name="user" size={25} /></span><h1>Every delivery starts somewhere.</h1><p>Sign in or create an account to post an ad or offer to carry a parcel.</p><button className="dialog-primary" onClick={onRequireAuth}>Continue to sign in <Icon name="arrow" size={17} /></button></div></main>;
 
@@ -1270,7 +1274,7 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
       const uploadedPhotos = [];
       const failures = [];
       const photosToUpload = form.type === "sender" ? photos : [];
-      for (const file of photosToUpload) {
+      for (const { file } of photosToUpload) {
         try {
           const signed = await apiRequest(`/announcements/${created.id}/photos/presign`, {
             method: "POST",
@@ -1385,11 +1389,20 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
             else if (photos.length + selected.length > 3) setError("You can add up to 3 route photos.");
             else {
               setError("");
-              setPhotos((current) => [...current, ...selected]);
+              const previews = selected.map((file) => {
+                const previewUrl = URL.createObjectURL(file);
+                photoPreviewUrls.current.set(file, previewUrl);
+                return { file, previewUrl };
+              });
+              setPhotos((current) => [...current, ...previews]);
             }
             event.target.value = "";
           }} /></label>
-          {photos.length > 0 && <div className="selected-files">{photos.map((file, index) => <div key={`${file.name}-${file.lastModified}`}><span><Icon name="box" size={15} />{file.name}<small>{(file.size / (1024 * 1024)).toFixed(1)} MB</small></span><button type="button" aria-label={`Remove ${file.name}`} onClick={() => setPhotos((current) => current.filter((_, photoIndex) => photoIndex !== index))}><Icon name="close" size={15} /></button></div>)}</div>}
+          {photos.length > 0 && <div className="selected-files">{photos.map(({ file, previewUrl }, index) => <div className="selected-photo" key={`${file.name}-${file.lastModified}-${index}`}><img src={previewUrl} alt={`Preview of ${file.name}`} /><span><Icon name="box" size={15} />{file.name}<small>{(file.size / (1024 * 1024)).toFixed(1)} MB</small></span><button type="button" aria-label={`Remove ${file.name}`} onClick={() => {
+            URL.revokeObjectURL(previewUrl);
+            photoPreviewUrls.current.delete(file);
+            setPhotos((current) => current.filter((_, photoIndex) => photoIndex !== index));
+          }}><Icon name="close" size={15} /></button></div>)}</div>}
         </div>}
         {error && <div className="form-error" role="alert">{error}</div>}
         <div className="post-submit"><span><Icon name="check" size={16} />Your contact details stay private.</span><button className="dialog-primary" disabled={busy}>{busy ? "Publishing..." : "Publish ad"}<Icon name="arrow" size={17} /></button></div>

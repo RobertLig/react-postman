@@ -77,6 +77,40 @@ test("shows parcel photos only for ads requesting a courier", async () => {
   expect(screen.queryByText("Add route photos")).not.toBeInTheDocument();
 });
 
+test("previews selected route photos and releases previews when removed", async () => {
+  const originalCreateObjectURL = URL.createObjectURL;
+  const originalRevokeObjectURL = URL.revokeObjectURL;
+  URL.createObjectURL = jest.fn()
+    .mockReturnValueOnce("blob:route-photo-preview")
+    .mockReturnValueOnce("blob:route-photo-preview-2");
+  URL.revokeObjectURL = jest.fn();
+  window.sessionStorage.setItem("wayline.accessToken", "test-token");
+  window.fetch.mockImplementation(async (url) => ({
+    ok: true,
+    text: async () => JSON.stringify(String(url).includes("/users/me")
+      ? { id: 3, name: "Taylor Traveler", email: "taylor@example.com" }
+      : { items: [], totalItems: 0 }),
+  }));
+
+  const { unmount } = render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: /Post an ad/ }));
+  fireEvent.click(screen.getByRole("button", { name: /I need a parcel delivered/ }));
+  const photo = new File(["photo"], "parcel.png", { type: "image/png" });
+  fireEvent.change(screen.getByLabelText("Add route photos"), { target: { files: [photo] } });
+
+  expect(screen.getByRole("img", { name: "Preview of parcel.png" })).toHaveAttribute("src", "blob:route-photo-preview");
+  fireEvent.click(screen.getByRole("button", { name: "Remove parcel.png" }));
+  expect(screen.queryByRole("img", { name: "Preview of parcel.png" })).not.toBeInTheDocument();
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:route-photo-preview");
+
+  const secondPhoto = new File(["photo 2"], "parcel-2.png", { type: "image/png" });
+  fireEvent.change(screen.getByLabelText("Add route photos"), { target: { files: [secondPhoto] } });
+  unmount();
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:route-photo-preview-2");
+  URL.createObjectURL = originalCreateObjectURL;
+  URL.revokeObjectURL = originalRevokeObjectURL;
+});
+
 test("selects geocoded cities and stops without exposing coordinate inputs", async () => {
   const supportsSvg = L.Browser.svg;
   L.Browser.svg = true;
