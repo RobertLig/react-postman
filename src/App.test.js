@@ -48,6 +48,145 @@ test("opens route details from a listing", async () => {
   expect(within(dialog).getByText("Prague")).toBeInTheDocument();
 });
 
+test("shows departure and arrival times and ordered stops in route details", async () => {
+  window.fetch.mockResolvedValue({
+    ok: true,
+    text: async () => JSON.stringify({
+      items: [{
+        id: 8,
+        type: "courier",
+        userId: 3,
+        postingPlace: "Berlin",
+        receptionPlace: "Prague",
+        postingDateTime: "2026-10-28T10:00:00",
+        receptionDateTime: "2026-10-28T15:00:00",
+        stops: [
+          { address: "Dresden, Germany", position: 1 },
+          { address: "Leipzig, Germany", position: 0 },
+        ],
+        translations: [{ title: "Berlin to Prague", description: "Room for a small parcel." }],
+      }],
+      totalItems: 1,
+    }),
+  });
+
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "View Berlin to Prague" }));
+
+  const dialog = screen.getByRole("dialog", { name: "Berlin to Prague" });
+  expect(within(dialog).getByText("Leaving")).toBeInTheDocument();
+  expect(within(dialog).getByText(/10:00/)).toBeInTheDocument();
+  expect(within(dialog).getByText("Arriving by")).toBeInTheDocument();
+  expect(within(dialog).getByText(/3:00/)).toBeInTheDocument();
+  const stops = within(dialog).getByRole("list", { name: "" });
+  expect(within(stops).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+    "1Leipzig, Germany",
+    "2Dresden, Germany",
+  ]);
+});
+
+test("keeps the photo gallery in the saved position order after sorting", async () => {
+  window.sessionStorage.setItem("wayline.accessToken", "test-token");
+  let sortRequest;
+  window.fetch.mockImplementation(async (input, options = {}) => {
+    const url = String(input);
+    if (url.includes("/users/me")) {
+      return {
+        ok: true,
+        text: async () => JSON.stringify({ id: 3, name: "Taylor Traveler", email: "taylor@example.com" }),
+      };
+    }
+    if (url.includes("/photos/sort")) {
+      sortRequest = JSON.parse(options.body);
+      return {
+        ok: true,
+        text: async () => JSON.stringify([
+          { id: 11, url: "https://images.example/first.jpg", position: 1 },
+          { id: 12, url: "https://images.example/second.jpg", position: 0 },
+        ]),
+      };
+    }
+    return {
+      ok: true,
+      text: async () => JSON.stringify({
+        items: [{
+          id: 7,
+          type: "sender",
+          userId: 3,
+          postingPlace: "Berlin",
+          receptionPlace: "Prague",
+          postingDateTime: "2026-10-28T10:00:00",
+          receptionDateTime: "2026-10-28T15:00:00",
+          translations: [{ title: "Berlin to Prague", description: "Room for a small parcel." }],
+          photos: [
+            { id: 11, url: "https://images.example/first.jpg", position: 0 },
+            { id: 12, url: "https://images.example/second.jpg", position: 1 },
+          ],
+        }],
+        totalItems: 1,
+      }),
+    };
+  });
+
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "View Berlin to Prague" }));
+  const dialog = screen.getByRole("dialog", { name: "Berlin to Prague" });
+  expect(within(dialog).getByText("Add parcel photos")).toBeInTheDocument();
+  fireEvent.click(within(dialog).getAllByRole("button", { name: "Move photo later" })[0]);
+
+  await waitFor(() => {
+    expect(sortRequest.map(({ id, position }) => ({ id, position }))).toEqual([
+      { id: 12, position: 0 },
+      { id: 11, position: 1 },
+    ]);
+    expect(Array.from(dialog.querySelectorAll(".photo-gallery img")).map((image) => image.src)).toEqual([
+      "https://images.example/second.jpg",
+      "https://images.example/first.jpg",
+    ]);
+  });
+});
+
+test("hides the add-photo control when the gallery reaches its three-photo limit", async () => {
+    window.sessionStorage.setItem("wayline.accessToken", "test-token");
+    window.fetch.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/users/me")) {
+        return {
+          ok: true,
+          text: async () => JSON.stringify({ id: 3, name: "Taylor Traveler", email: "taylor@example.com" }),
+        };
+      }
+      return {
+        ok: true,
+        text: async () => JSON.stringify({
+          items: [{
+            id: 7,
+            type: "sender",
+            userId: 3,
+            postingPlace: "Berlin",
+            receptionPlace: "Prague",
+            postingDateTime: "2026-10-28T10:00:00",
+            receptionDateTime: "2026-10-28T15:00:00",
+            translations: [{ title: "Berlin to Prague", description: "Room for a small parcel." }],
+            photos: [0, 1, 2].map((position) => ({
+              id: position + 11,
+              url: `https://images.example/${position}.jpg`,
+              position,
+            })),
+          }],
+          totalItems: 1,
+        }),
+      };
+    });
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "View Berlin to Prague" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Berlin to Prague" });
+    expect(dialog.querySelectorAll(".photo-gallery img")).toHaveLength(3);
+    expect(within(dialog).queryByText("Add parcel photos")).not.toBeInTheDocument();
+});
+
 test("opens the account dialog from the header", async () => {
   render(<App />);
 
@@ -70,11 +209,11 @@ test("shows parcel photos only for ads requesting a courier", async () => {
   render(<App />);
   fireEvent.click(await screen.findByRole("button", { name: /Post an ad/ }));
 
-  expect(screen.queryByText("Add route photos")).not.toBeInTheDocument();
+  expect(screen.queryByText("Add parcel photos")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: /I need a parcel delivered/ }));
-  expect(screen.getByText("Add route photos")).toBeInTheDocument();
+  expect(screen.getByText("Add parcel photos")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: /I can deliver a parcel/ }));
-  expect(screen.queryByText("Add route photos")).not.toBeInTheDocument();
+  expect(screen.queryByText("Add parcel photos")).not.toBeInTheDocument();
 });
 
 test("previews selected route photos and releases previews when removed", async () => {
@@ -97,7 +236,7 @@ test("previews selected route photos and releases previews when removed", async 
   fireEvent.click(screen.getByRole("button", { name: /I need a parcel delivered/ }));
   const photo = new File(["photo"], "parcel.png", { type: "image/png" });
   const secondPhoto = new File(["photo 2"], "parcel-2.png", { type: "image/png" });
-  const picker = screen.getByLabelText("Add route photos");
+  const picker = screen.getByLabelText("Add parcel photos");
   fireEvent.change(picker, { target: { files: [photo] } });
   fireEvent.change(picker, { target: { files: [secondPhoto] } });
 
@@ -269,6 +408,59 @@ test("clears optional profile fields and sends null values to the API", async ()
       phone: null,
     }));
   });
+});
+
+test("refreshes delivery ads after deleting the account", async () => {
+  window.sessionStorage.setItem("wayline.accessToken", "test-token");
+  const confirmSpy = jest.spyOn(window, "confirm").mockReturnValue(true);
+  window.fetch.mockImplementation(async (input, options = {}) => {
+    const url = String(input);
+    if (url.includes("/users/me") && options.method === "DELETE") {
+      return { ok: true, text: async () => "" };
+    }
+    if (url.includes("/users/me")) {
+      return {
+        ok: true,
+        text: async () => JSON.stringify({ id: 3, name: "Taylor Traveler", email: "taylor@example.com" }),
+      };
+    }
+    if (url.includes("/announcements")) {
+      const deleted = window.fetch.mock.calls.some(
+        ([calledUrl, calledOptions]) => String(calledUrl).includes("/users/me")
+          && calledOptions.method === "DELETE",
+      );
+      return {
+        ok: true,
+        text: async () => JSON.stringify(deleted
+          ? { items: [], totalItems: 0 }
+          : {
+              items: [{
+                id: 7,
+                type: "courier",
+                userId: 3,
+                translations: [{ title: "Berlin to Prague", description: "Room for a small parcel." }],
+              }],
+              totalItems: 1,
+            }),
+      };
+    }
+    return { ok: true, text: async () => "" };
+  });
+
+  render(<App />);
+  expect(await screen.findByText("Berlin to Prague")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /Taylor Traveler/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Delete account" }));
+
+  await waitFor(() => {
+    expect(screen.queryByText("Berlin to Prague")).not.toBeInTheDocument();
+    expect(screen.getByText("Your Wayline account has been deleted.")).toBeInTheDocument();
+  });
+  expect(window.fetch).toHaveBeenCalledWith(
+    expect.stringContaining("/announcements?page=0&size=12"),
+    expect.objectContaining({ method: "GET" }),
+  );
+  confirmSpy.mockRestore();
 });
 
 test("defaults country from locale, allows changing country, and saves international format", async () => {

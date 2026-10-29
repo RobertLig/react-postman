@@ -146,6 +146,15 @@ h1, h2, h3, p { margin-top: 0; }
 .detail-route b, .detail-route small { display: block; }
 .detail-route b { overflow: hidden; color: #385363; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .detail-route small { margin-top: 4px; color: #89979d; font-size: 9px; }
+.detail-schedule { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 12px 0; }
+.detail-schedule > div { display: grid; gap: 4px; padding: 10px 12px; border-radius: 8px; background: #f7f9f9; }
+.detail-schedule small { color: #89979d; font-size: 9px; }
+.detail-schedule time { color: #385363; font-size: 10px; font-weight: 600; }
+.detail-stops { margin: 14px 0; }
+.detail-stops h3 { margin: 0 0 8px; color: #526977; font-size: 10px; }
+.detail-stops ol { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.detail-stops li { display: flex; align-items: center; gap: 8px; color: #657883; font-size: 10px; }
+.detail-stops li span { width: 18px; height: 18px; display: inline-grid; flex: 0 0 18px; place-items: center; border-radius: 50%; color: #4a7c83; background: #e7f1ef; font-size: 9px; font-weight: 700; }
 .photo-gallery { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin: -5px 0 17px; }
 .detail-photo { position: relative; overflow: hidden; min-height: 88px; border-radius: 8px; background: #eef3f4; }
 .detail-photo img { width: 100%; height: 105px; display: block; object-fit: cover; }

@@ -370,9 +370,14 @@ function App() {
       setSupportConversations([]);
       setMessages([]);
       setPage("explore");
+      setSelectedAnnouncement(null);
+      setAnnouncements([]);
+      setTotalItems(0);
+      setTotalPages(0);
       setNotice(logoutError
         ? `Your account was deleted, but the sign-out cookie could not be cleared: ${logoutError}`
         : "Your Wayline account has been deleted.");
+      await loadAnnouncements();
     }
   };
 
@@ -903,17 +908,18 @@ function ProfilePage({ token, user, onSave, onSignOut, onDeleteAccount, onRequir
 
 function AnnouncementDialog({ announcement, token, onClose, onContact, onChange, onDelete, user }) {
   const needsCourier = announcement.type === "sender";
-  const [photos, setPhotos] = useState(announcement.photos || []);
+  const [photos, setPhotos] = useState(() => sortPhotosByPosition(announcement.photos));
   const [photoError, setPhotoError] = useState("");
   const [photoBusy, setPhotoBusy] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(announcementTitle(announcement));
   const [editDescription, setEditDescription] = useState(announcementDescription(announcement));
-  useEffect(() => setPhotos(announcement.photos || []), [announcement]);
+  useEffect(() => setPhotos(sortPhotosByPosition(announcement.photos)), [announcement]);
 
   const refreshPhotos = (updated) => {
-    setPhotos(updated);
-    onChange({ ...announcement, photos: updated });
+    const ordered = sortPhotosByPosition(updated);
+    setPhotos(ordered);
+    onChange({ ...announcement, photos: ordered });
   };
   const setMainPhoto = async (photo) => {
     setPhotoBusy(true);
@@ -965,7 +971,7 @@ function AnnouncementDialog({ announcement, token, onClose, onContact, onChange,
     try {
       if (!["image/jpeg", "image/jpg", "image/png"].includes(file.type)) throw new Error("Choose a JPG or PNG image.");
       if (!file.size || file.size > 5 * 1024 * 1024) throw new Error("Photos must be smaller than 5 MB.");
-      if (photos.length >= 3) throw new Error("A route can have up to 3 photos.");
+      if (photos.length >= 3) throw new Error("A parcel can have up to 3 photos.");
       const signed = await apiRequest(`/announcements/${announcement.id}/photos/presign`, {
         method: "POST",
         token,
@@ -1028,21 +1034,59 @@ function AnnouncementDialog({ announcement, token, onClose, onContact, onChange,
           <div className="detail-eyebrow">{formatDate(announcement.postingDateTime, { weekday: "long", month: "long", day: "numeric" })}</div>
           {editing ? <form className="announcement-edit-form" onSubmit={saveAnnouncement}><label>Route title<input value={editTitle} maxLength="150" required onChange={(event) => setEditTitle(event.target.value)} /></label><label>Description<textarea value={editDescription} rows="4" maxLength="2000" onChange={(event) => setEditDescription(event.target.value)} /></label><div><button className="outline-button" type="button" onClick={() => setEditing(false)}>Cancel</button><button className="dialog-primary" disabled={photoBusy}>{photoBusy ? "Saving..." : "Save route"}<Icon name="check" size={15} /></button></div></form> : <h2 id="detail-title">{announcementTitle(announcement)}</h2>}
           {photos.length > 0 && <div className="photo-gallery">{photos.map((photo, index) => <div className="detail-photo" key={photo.id}><img src={photo.url} alt={`Route ${index + 1}`} />{String(user?.id) === String(announcement.userId) && <div className="photo-actions">{photo.position === 0 ? <span>Cover photo</span> : <button disabled={photoBusy} onClick={() => setMainPhoto(photo)}>Make cover</button>}<button disabled={photoBusy || index === 0} title="Move photo earlier" onClick={() => movePhoto(index, -1)} aria-label="Move photo earlier">↑</button><button disabled={photoBusy || index === photos.length - 1} title="Move photo later" onClick={() => movePhoto(index, 1)} aria-label="Move photo later">↓</button><button disabled={photoBusy} onClick={() => removePhoto(photo)} aria-label="Remove photo"><Icon name="close" size={14} /></button></div>}</div>)}</div>}
-          {String(user?.id) === String(announcement.userId) && <label className="add-photo-control"><Icon name="plus" size={15} />{photoBusy ? "Uploading..." : "Add a route photo"}<input type="file" accept="image/jpeg,image/png" disabled={photoBusy || photos.length >= 3} onChange={(event) => { addPhoto(event.target.files?.[0]); event.target.value = ""; }} /></label>}
+          {String(user?.id) === String(announcement.userId) && photos.length < 3 && <label className="add-photo-control"><Icon name="plus" size={15} />{photoBusy ? "Uploading..." : "Add parcel photos"}<input type="file" accept="image/jpeg,image/png" disabled={photoBusy} onChange={(event) => { addPhoto(event.target.files?.[0]); event.target.value = ""; }} /></label>}
           {photoError && <div className="form-error" role="alert">{photoError}</div>}
           <div className="detail-route"><span className="route-point start" /><div><b>{announcement.postingPlace}</b><small>Starting point</small></div><span className="detail-route-line" /><span className="route-point end" /><div><b>{announcement.receptionPlace}</b><small>Destination</small></div></div>
+          <div className="detail-schedule">
+            {announcement.postingDateTime && <div><small>Leaving</small><time dateTime={announcement.postingDateTime}>{formatDate(announcement.postingDateTime, { weekday: "long", month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}</time></div>}
+            {announcement.receptionDateTime && <div><small>Arriving by</small><time dateTime={announcement.receptionDateTime}>{formatDate(announcement.receptionDateTime, { weekday: "long", month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}</time></div>}
+          </div>
+          {announcement.stops?.length > 0 && <div className="detail-stops">
+            <h3>Stops along the way</h3>
+            <ol>{sortStopsByPosition(announcement.stops)
+              .map(({ stop }, index) => <li key={stop.id || `${stop.position}-${stop.address}`}><span>{index + 1}</span>{stop.address}</li>)}</ol>
+          </div>}
           {!editing && announcementDescription(announcement) && <p className="detail-description">{announcementDescription(announcement)}</p>}
-          <div className="detail-facts">
+          {(announcement.weight?.value > 0 || announcement.dimensions?.width > 0) && <div className="detail-facts">
             {announcement.weight?.value > 0 && <span><Icon name="box" size={16} />Up to {announcement.weight.value} {announcement.weight.unit === "imperial" ? "lb" : "kg"}</span>}
             {announcement.dimensions?.width > 0 && <span><Icon name="box" size={16} />{announcement.dimensions.width} × {announcement.dimensions.height} × {announcement.dimensions.length} {announcement.dimensions.unit === "imperial" ? "in" : "cm"}</span>}
-            <span><Icon name="calendar" size={16} />Available {formatDate(announcement.receptionDateTime)}</span>
-          </div>
+          </div>}
           {String(user?.id) === String(announcement.userId) ? <div className="owner-route-actions"><button className="dialog-primary" onClick={() => setEditing((current) => !current)}><Icon name="user" size={15} />{editing ? "Editing route" : "Edit route"}</button><button className="delete-route-button" disabled={photoBusy} onClick={deleteAnnouncement}>Remove this route</button></div> : <button className="dialog-primary" onClick={onContact}>{user ? "Message about this route" : "Sign in to get in touch"}<Icon name="arrow" size={17} /></button>}
           <p className="dialog-footnote">Keep your conversation on Wayline while you make a plan.</p>
         </div>
       </section>
     </div>
   );
+}
+
+function sortPhotosByPosition(photos) {
+  if (!Array.isArray(photos)) return [];
+  return photos
+    .map((photo, index) => ({ photo, index }))
+    .sort((left, right) => {
+      const getPosition = ({ photo, index }) => {
+        const position = Number(photo.position);
+        return photo.position !== null && photo.position !== "" && Number.isFinite(position)
+          ? position
+          : index;
+      };
+      return getPosition(left) - getPosition(right) || left.index - right.index;
+    })
+    .map(({ photo }) => photo);
+}
+
+function sortStopsByPosition(stops) {
+  return stops
+    .map((stop, index) => ({ stop, index }))
+    .sort((left, right) => {
+      const getPosition = ({ stop, index }) => {
+        const position = Number(stop.position);
+        return stop.position !== null && stop.position !== "" && Number.isFinite(position)
+          ? position
+          : index;
+      };
+      return getPosition(left) - getPosition(right) || left.index - right.index;
+    });
 }
 
 function AuthDialog({ initialMode, resetToken, onClose, onAuthenticated, onNotice }) {
@@ -1381,13 +1425,13 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
           />
         </div>
         {form.type === "sender" && <div className="form-section"><h2>Photos <span className="optional-label">optional · up to 3 JPG or PNG, 5 MB each</span></h2>
-          <label className="photo-picker"> <Icon name="plus" size={17} /> Add route photos<input type="file" accept="image/jpeg,image/png" multiple disabled={photos.length >= 3} onChange={(event) => {
+          <label className="photo-picker"> <Icon name="plus" size={17} /> Add parcel photos<input type="file" accept="image/jpeg,image/png" multiple disabled={photos.length >= 3} onChange={(event) => {
             const selected = Array.from(event.target.files || []);
             const invalidType = selected.find((file) => !["image/jpeg", "image/jpg", "image/png"].includes(file.type));
             const invalidSize = selected.find((file) => file.size > 5 * 1024 * 1024);
             if (invalidType) setError(`${invalidType.name} is not a JPG or PNG image.`);
             else if (invalidSize) setError(`${invalidSize.name} exceeds the 5 MB limit.`);
-            else if (photos.length + selected.length > 3) setError("You can add up to 3 route photos.");
+            else if (photos.length + selected.length > 3) setError("You can add up to 3 parcel photos.");
             else {
               setError("");
               const previews = selected.map((file) => {
