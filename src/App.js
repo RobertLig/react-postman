@@ -13,6 +13,7 @@ import "react-phone-input-2/lib/style.css";
 import "./App.css";
 import LocationAutocomplete from "./LocationAutocomplete";
 import LocationMap from "./LocationMap";
+import SortableList from "./SortableList";
 import { reverseGeocodeLocation } from "./geocoding";
 
 const GOOGLE_CLIENT_ID =
@@ -1346,19 +1347,31 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
         <div className="form-section"><h2>Stops and parcel details</h2>
           <label className="terms-field weight-toggle"><input type="checkbox" checked={includeDimensions} onChange={(event) => setIncludeDimensions(event.target.checked)} /><span>I can share maximum parcel dimensions</span></label>
           {includeDimensions && <div className="form-grid dimensions-fields"><label>Width (cm)<input type="number" min="0.1" step="0.1" required value={dimensions.width} onChange={(event) => setDimensions({ ...dimensions, width: event.target.value })} /></label><label>Height (cm)<input type="number" min="0.1" step="0.1" required value={dimensions.height} onChange={(event) => setDimensions({ ...dimensions, height: event.target.value })} /></label><label>Length (cm)<input type="number" min="0.1" step="0.1" required value={dimensions.length} onChange={(event) => setDimensions({ ...dimensions, length: event.target.value })} /></label></div>}
-          <div className="stops-heading"><p>Add optional pickup or meeting points along the way.</p><button type="button" className="outline-button" disabled={stops.length >= 5} onClick={() => {
+          <div className="stops-heading"><p>Add optional pickup or meeting points; use the arrows to set their order.</p><button type="button" className="outline-button" disabled={stops.length >= 5} onClick={() => {
             const id = `stop-${nextStopId.current++}`;
             setStops((current) => [...current, { id, address: "", location: null }]);
             setActiveLocationKey(id);
           }}><Icon name="plus" size={14} />Add stop</button></div>
-          {stops.map((stop) => <div className="stop-row" key={stop.id}><LocationAutocomplete label="Stop address" value={stop.address} selectedLocation={stop.location} required onActivate={() => setActiveLocationKey(stop.id)} onChange={(value, location) => {
-            reverseGeocodeController.current?.abort();
-            setActiveLocationKey(stop.id);
-            setStops((current) => current.map((item) => item.id === stop.id ? { ...item, address: value, location } : item));
-          }} /><button type="button" className="remove-stop" aria-label="Remove stop" onClick={() => {
-            setStops((current) => current.filter((item) => item.id !== stop.id));
-            if (activeLocationKey === stop.id) setActiveLocationKey("origin");
-          }}><Icon name="close" size={15} /></button></div>)}
+          <SortableList
+            items={stops}
+            onChange={setStops}
+            itemLabel="stop"
+            listLabel="Stops in route order"
+            getItemKey={(stop) => stop.id}
+            renderItem={(stop) => (
+              <div className="stop-row">
+                <LocationAutocomplete label="Stop address" value={stop.address} selectedLocation={stop.location} required onActivate={() => setActiveLocationKey(stop.id)} onChange={(value, location) => {
+                  reverseGeocodeController.current?.abort();
+                  setActiveLocationKey(stop.id);
+                  setStops((current) => current.map((item) => item.id === stop.id ? { ...item, address: value, location } : item));
+                }} />
+                <button type="button" className="remove-stop" aria-label="Remove stop" onClick={() => {
+                  setStops((current) => current.filter((item) => item.id !== stop.id));
+                  if (activeLocationKey === stop.id) setActiveLocationKey("origin");
+                }}><Icon name="close" size={15} /></button>
+              </div>
+            )}
+          />
         </div>
         {form.type === "sender" && <div className="form-section"><h2>Photos <span className="optional-label">optional · up to 3 JPG or PNG, 5 MB each</span></h2>
           <label className="photo-picker"> <Icon name="plus" size={17} /> Add route photos<input type="file" accept="image/jpeg,image/png" multiple disabled={photos.length >= 3} onChange={(event) => {

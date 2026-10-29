@@ -79,6 +79,7 @@ test("shows parcel photos only for ads requesting a courier", async () => {
 test("selects geocoded cities and stops without exposing coordinate inputs", async () => {
   const supportsSvg = L.Browser.svg;
   L.Browser.svg = true;
+  const polyline = jest.spyOn(L, "polyline");
   window.sessionStorage.setItem("wayline.accessToken", "test-token");
   window.fetch.mockImplementation(async (input, options = {}) => {
     const url = String(input);
@@ -88,6 +89,8 @@ test("selects geocoded cities and stops without exposing coordinate inputs", asy
         ? { name: "Berlin", country: "Germany", longitude: 13.405, latitude: 52.52 }
         : query.startsWith("pra")
           ? { name: "Prague", country: "Czechia", longitude: 14.4378, latitude: 50.0755 }
+          : query.startsWith("leip")
+            ? { name: "Leipzig", country: "Germany", longitude: 12.3731, latitude: 51.3397 }
           : { name: "Dresden", country: "Germany", longitude: 13.7373, latitude: 51.0504 };
       return {
         ok: true,
@@ -132,9 +135,18 @@ test("selects geocoded cities and stops without exposing coordinate inputs", asy
   expect(screen.getByText("Active field: Stop 1")).toBeInTheDocument();
   await userEvent.type(screen.getByRole("combobox", { name: "Stop address" }), "Dres");
   fireEvent.click(await screen.findByRole("option", { name: "Dresden, Germany" }));
+  fireEvent.click(screen.getByRole("button", { name: "Add stop" }));
+  const stopInputs = screen.getAllByRole("combobox", { name: "Stop address" });
+  await userEvent.type(stopInputs[1], "Leip");
+  fireEvent.click(await screen.findByRole("option", { name: "Leipzig, Germany" }));
 
-  expect(document.querySelectorAll(".location-map-marker")).toHaveLength(3);
-  expect(document.querySelector(".leaflet-overlay-pane path.leaflet-interactive")).toBeInTheDocument();
+  expect(document.querySelectorAll(".location-map-marker")).toHaveLength(4);
+  fireEvent.click(screen.getByRole("button", { name: "Move stop 2 up" }));
+  await waitFor(() => expect(polyline).toHaveBeenLastCalledWith(
+    [[52.52, 13.405], [51.3397, 12.3731], [51.0504, 13.7373], [50.0755, 14.4378]],
+    { color: "#438b91", weight: 3, opacity: 0.8 },
+  ));
+  polyline.mockRestore();
   L.Browser.svg = supportsSvg;
   expect(screen.queryByLabelText(/latitude|longitude/i)).not.toBeInTheDocument();
   await userEvent.type(screen.getByLabelText("Give your route a title"), "Berlin parcel trip");
@@ -154,7 +166,10 @@ test("selects geocoded cities and stops without exposing coordinate inputs", asy
       receptionPlace: "Prague, Czechia",
       receptionLatitude: 50.0755,
       receptionLongitude: 14.4378,
-      stops: [{ address: "Dresden, Germany", latitude: 51.0504, longitude: 13.7373, position: 0 }],
+      stops: [
+        { address: "Leipzig, Germany", latitude: 51.3397, longitude: 12.3731, position: 0 },
+        { address: "Dresden, Germany", latitude: 51.0504, longitude: 13.7373, position: 1 },
+      ],
     }));
   });
 });
