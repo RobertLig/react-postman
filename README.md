@@ -24,6 +24,7 @@ this for a different API origin with a local `.env` file:
 ```env
 REACT_APP_API_URL=http://localhost:8080
 REACT_APP_GOOGLE_CLIENT_ID=your-google-web-client-id
+REACT_APP_GEOCODING_URL=https://photon.komoot.io/api/
 ```
 
 The Google client ID defaults to the one configured by the development API.
@@ -31,9 +32,14 @@ The API must allow the frontend origin through its CORS configuration. For
 local development, start Quarkus with `./mvnw quarkus:dev` from the API
 project; its dev profile allows `http://localhost:3000`.
 
-The route-posting form accepts city names and coordinates because the API
-requires latitude and longitude for both ends of a route. Those coordinates
-can be looked up with a map service.
+The route-posting form uses Photon place search with OpenStreetMap data for
+starting cities, destinations, and stops. Select a suggestion to fill in the
+coordinates required by the API; manually typed place names are not submitted
+without a matching selection. The default Photon endpoint is free to use
+without a key, but it is a shared community service without an availability
+guarantee. For higher traffic, host Photon yourself and set
+`REACT_APP_GEOCODING_URL` to that instance's API URL. Place results are
+attributed to OpenStreetMap contributors in the interface.
 
 Uploads use the API's short-lived signed S3 URLs. Route photos and avatars are
 JPG/PNG images up to 5 MB; each route allows three photos. Message attachments

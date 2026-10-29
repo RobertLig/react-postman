@@ -11,6 +11,7 @@ import {
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 import "./App.css";
+import LocationAutocomplete from "./LocationAutocomplete";
 
 const GOOGLE_CLIENT_ID =
   process.env.REACT_APP_GOOGLE_CLIENT_ID ||
@@ -1144,7 +1145,8 @@ function AuthDialog({ initialMode, resetToken, onClose, onAuthenticated, onNotic
 }
 
 function PostRoute({ token, user, onRequireAuth, onPosted }) {
-  const [form, setForm] = useState({ type: "courier", title: "", description: "", postingPlace: "", receptionPlace: "", postingLatitude: "", postingLongitude: "", receptionLatitude: "", receptionLongitude: "", postingDateTime: "", receptionDateTime: "" });
+  const [form, setForm] = useState({ type: "courier", title: "", description: "", postingPlace: "", receptionPlace: "", postingDateTime: "", receptionDateTime: "" });
+  const [locations, setLocations] = useState({ origin: null, destination: null });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [includeWeight, setIncludeWeight] = useState(false);
@@ -1157,19 +1159,36 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
   if (!token || !user) return <main className="post-page"><div className="post-auth"><span className="empty-icon"><Icon name="user" size={25} /></span><h1>Every delivery starts somewhere.</h1><p>Sign in or create an account to post an ad or offer to carry a parcel.</p><button className="dialog-primary" onClick={onRequireAuth}>Continue to sign in <Icon name="arrow" size={17} /></button></div></main>;
 
   const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const updateLocation = (field, key, value, location) => {
+    update(field, value);
+    setLocations((current) => ({ ...current, [key]: location }));
+    if (location) setError("");
+  };
   const submit = async (event) => {
     event.preventDefault();
+    if (!locations.origin) {
+      setError("Select a starting city from the suggestions.");
+      return;
+    }
+    if (!locations.destination) {
+      setError("Select a destination city from the suggestions.");
+      return;
+    }
+    if (stops.some((stop) => !stop.location)) {
+      setError("Select a suggested place for each stop, or remove that stop.");
+      return;
+    }
     setBusy(true);
     setError("");
     const payload = {
       type: form.type,
       userId: user.id,
       postingPlace: form.postingPlace,
-      postingLatitude: Number(form.postingLatitude),
-      postingLongitude: Number(form.postingLongitude),
+      postingLatitude: locations.origin.latitude,
+      postingLongitude: locations.origin.longitude,
       receptionPlace: form.receptionPlace,
-      receptionLatitude: Number(form.receptionLatitude),
-      receptionLongitude: Number(form.receptionLongitude),
+      receptionLatitude: locations.destination.latitude,
+      receptionLongitude: locations.destination.longitude,
       postingDateTime: form.postingDateTime,
       receptionDateTime: form.receptionDateTime,
       translations: [{ language: navigator.language?.toLowerCase().startsWith("pl") ? "pl" : "en", title: form.title, description: form.description }],
@@ -1184,9 +1203,9 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
       } : {}),
       ...(stops.length ? {
         stops: stops.map((stop, position) => ({
-          ...stop,
-          latitude: Number(stop.latitude),
-          longitude: Number(stop.longitude),
+          address: stop.address,
+          latitude: stop.location.latitude,
+          longitude: stop.location.longitude,
           position,
         })),
       } : {}),
@@ -1196,7 +1215,8 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
       const created = response.announcement;
       const uploadedPhotos = [];
       const failures = [];
-      for (const file of photos) {
+      const photosToUpload = form.type === "sender" ? photos : [];
+      for (const file of photosToUpload) {
         try {
           const signed = await apiRequest(`/announcements/${created.id}/photos/presign`, {
             method: "POST",
@@ -1231,15 +1251,23 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
           <button type="button" className={`type-option ${form.type === "sender" ? "chosen" : ""}`} onClick={() => update("type", "sender")}><span className="type-option-icon"><Icon name="box" size={20} /></span><span><b>I need a parcel delivered</b><small>I have something to send along this route.</small></span><span className="radio-dot" /></button>
         </div></fieldset>
         <div className="form-section"><h2>Where are you going?</h2><div className="form-grid">
-          <label>Starting city<input required value={form.postingPlace} onChange={(event) => update("postingPlace", event.target.value)} placeholder="e.g. Berlin, Germany" /></label>
-          <label>Destination city<input required value={form.receptionPlace} onChange={(event) => update("receptionPlace", event.target.value)} placeholder="e.g. Prague, Czechia" /></label>
-          <label>Start latitude<input required type="number" step="any" min="-90" max="90" value={form.postingLatitude} onChange={(event) => update("postingLatitude", event.target.value)} placeholder="52.5200" /></label>
-          <label>Start longitude<input required type="number" step="any" min="-180" max="180" value={form.postingLongitude} onChange={(event) => update("postingLongitude", event.target.value)} placeholder="13.4050" /></label>
-          <label>Destination latitude<input required type="number" step="any" min="-90" max="90" value={form.receptionLatitude} onChange={(event) => update("receptionLatitude", event.target.value)} placeholder="50.0755" /></label>
-          <label>Destination longitude<input required type="number" step="any" min="-180" max="180" value={form.receptionLongitude} onChange={(event) => update("receptionLongitude", event.target.value)} placeholder="14.4378" /></label>
+          <LocationAutocomplete
+            label="Starting city"
+            value={form.postingPlace}
+            selectedLocation={locations.origin}
+            required
+            onChange={(value, location) => updateLocation("postingPlace", "origin", value, location)}
+          />
+          <LocationAutocomplete
+            label="Destination city"
+            value={form.receptionPlace}
+            selectedLocation={locations.destination}
+            required
+            onChange={(value, location) => updateLocation("receptionPlace", "destination", value, location)}
+          />
           <label>Leaving<input required type="datetime-local" value={form.postingDateTime} onChange={(event) => update("postingDateTime", event.target.value)} /></label>
           <label>Arriving by<input required type="datetime-local" value={form.receptionDateTime} onChange={(event) => update("receptionDateTime", event.target.value)} /></label>
-        </div><p className="field-hint">Coordinates help people find routes near them. You can look up a city’s coordinates on a map.</p></div>
+        </div><p className="field-hint">Choose a suggestion to add its location automatically. Search uses Photon and © OpenStreetMap contributors.</p></div>
         <div className="form-section"><h2>A few more details</h2><div className="form-grid">
           <label className="full-span">Give your route a title<input required maxLength={150} value={form.title} onChange={(event) => update("title", event.target.value)} placeholder="A short, friendly headline" /></label>
           <label className="full-span">Anything else people should know?<textarea rows="4" maxLength={2000} value={form.description} onChange={(event) => update("description", event.target.value)} placeholder="Share a little more about the journey..." /></label>
@@ -1247,10 +1275,10 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
         <div className="form-section"><h2>Stops and parcel details</h2>
           <label className="terms-field weight-toggle"><input type="checkbox" checked={includeDimensions} onChange={(event) => setIncludeDimensions(event.target.checked)} /><span>I can share maximum parcel dimensions</span></label>
           {includeDimensions && <div className="form-grid dimensions-fields"><label>Width (cm)<input type="number" min="0.1" step="0.1" required value={dimensions.width} onChange={(event) => setDimensions({ ...dimensions, width: event.target.value })} /></label><label>Height (cm)<input type="number" min="0.1" step="0.1" required value={dimensions.height} onChange={(event) => setDimensions({ ...dimensions, height: event.target.value })} /></label><label>Length (cm)<input type="number" min="0.1" step="0.1" required value={dimensions.length} onChange={(event) => setDimensions({ ...dimensions, length: event.target.value })} /></label></div>}
-          <div className="stops-heading"><p>Add optional pickup or meeting points along the way.</p><button type="button" className="outline-button" disabled={stops.length >= 5} onClick={() => setStops((current) => [...current, { address: "", latitude: "", longitude: "" }])}><Icon name="plus" size={14} />Add stop</button></div>
-          {stops.map((stop, index) => <div className="stop-row" key={`stop-${index}`}><label>Stop address<input required value={stop.address} onChange={(event) => setStops((current) => current.map((item, stopIndex) => stopIndex === index ? { ...item, address: event.target.value } : item))} placeholder="City or meeting point" /></label><label>Latitude<input required type="number" step="any" min="-90" max="90" value={stop.latitude} onChange={(event) => setStops((current) => current.map((item, stopIndex) => stopIndex === index ? { ...item, latitude: event.target.value } : item))} /></label><label>Longitude<input required type="number" step="any" min="-180" max="180" value={stop.longitude} onChange={(event) => setStops((current) => current.map((item, stopIndex) => stopIndex === index ? { ...item, longitude: event.target.value } : item))} /></label><button type="button" className="remove-stop" aria-label="Remove stop" onClick={() => setStops((current) => current.filter((_, stopIndex) => stopIndex !== index))}><Icon name="close" size={15} /></button></div>)}
+          <div className="stops-heading"><p>Add optional pickup or meeting points along the way.</p><button type="button" className="outline-button" disabled={stops.length >= 5} onClick={() => setStops((current) => [...current, { address: "", location: null }])}><Icon name="plus" size={14} />Add stop</button></div>
+          {stops.map((stop, index) => <div className="stop-row" key={`stop-${index}`}><LocationAutocomplete label="Stop address" value={stop.address} selectedLocation={stop.location} required onChange={(value, location) => setStops((current) => current.map((item, stopIndex) => stopIndex === index ? { ...item, address: value, location } : item))} /><button type="button" className="remove-stop" aria-label="Remove stop" onClick={() => setStops((current) => current.filter((_, stopIndex) => stopIndex !== index))}><Icon name="close" size={15} /></button></div>)}
         </div>
-        <div className="form-section"><h2>Photos <span className="optional-label">optional · up to 3 JPG or PNG, 5 MB each</span></h2>
+        {form.type === "sender" && <div className="form-section"><h2>Photos <span className="optional-label">optional · up to 3 JPG or PNG, 5 MB each</span></h2>
           <label className="photo-picker"> <Icon name="plus" size={17} /> Add route photos<input type="file" accept="image/jpeg,image/png" multiple disabled={photos.length >= 3} onChange={(event) => {
             const selected = Array.from(event.target.files || []);
             const invalidType = selected.find((file) => !["image/jpeg", "image/jpg", "image/png"].includes(file.type));
@@ -1265,7 +1293,7 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
             event.target.value = "";
           }} /></label>
           {photos.length > 0 && <div className="selected-files">{photos.map((file, index) => <div key={`${file.name}-${file.lastModified}`}><span><Icon name="box" size={15} />{file.name}<small>{(file.size / (1024 * 1024)).toFixed(1)} MB</small></span><button type="button" aria-label={`Remove ${file.name}`} onClick={() => setPhotos((current) => current.filter((_, photoIndex) => photoIndex !== index))}><Icon name="close" size={15} /></button></div>)}</div>}
-        </div>
+        </div>}
         {error && <div className="form-error" role="alert">{error}</div>}
         <div className="post-submit"><span><Icon name="check" size={16} />Your contact details stay private.</span><button className="dialog-primary" disabled={busy}>{busy ? "Publishing..." : "Publish ad"}<Icon name="arrow" size={17} /></button></div>
       </form>

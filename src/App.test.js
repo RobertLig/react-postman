@@ -56,6 +56,101 @@ test("opens the account dialog from the header", async () => {
   expect(screen.getByRole("button", { name: "Forgot your password?" })).toBeInTheDocument();
 });
 
+test("shows parcel photos only for ads requesting a courier", async () => {
+  window.sessionStorage.setItem("wayline.accessToken", "test-token");
+  window.fetch.mockImplementation(async (url) => ({
+    ok: true,
+    text: async () => JSON.stringify(url.includes("/users/me")
+      ? { id: 3, name: "Taylor Traveler", email: "taylor@example.com" }
+      : { items: [], totalItems: 0 }),
+  }));
+
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: /Post an ad/ }));
+
+  expect(screen.queryByText("Add route photos")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /I need a parcel delivered/ }));
+  expect(screen.getByText("Add route photos")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /I can deliver a parcel/ }));
+  expect(screen.queryByText("Add route photos")).not.toBeInTheDocument();
+});
+
+test("selects geocoded cities and stops without exposing coordinate inputs", async () => {
+  window.sessionStorage.setItem("wayline.accessToken", "test-token");
+  window.fetch.mockImplementation(async (input, options = {}) => {
+    const url = String(input);
+    if (url.includes("photon.komoot.io")) {
+      const query = new URL(url).searchParams.get("q").toLowerCase();
+      const place = query.startsWith("ber")
+        ? { name: "Berlin", country: "Germany", longitude: 13.405, latitude: 52.52 }
+        : query.startsWith("pra")
+          ? { name: "Prague", country: "Czechia", longitude: 14.4378, latitude: 50.0755 }
+          : { name: "Dresden", country: "Germany", longitude: 13.7373, latitude: 51.0504 };
+      return {
+        ok: true,
+        json: async () => ({
+          features: [{
+            id: "place-1",
+            properties: { name: place.name, city: place.name, country: place.country, osm_type: "R", osm_id: 1 },
+            geometry: { coordinates: [place.longitude, place.latitude] },
+            bbox: [place.longitude - 0.1, place.latitude - 0.1, place.longitude + 0.1, place.latitude + 0.1],
+          }],
+        }),
+      };
+    }
+
+    if (url.includes("/users/me")) {
+      return {
+        ok: true,
+        text: async () => JSON.stringify({ id: 3, name: "Taylor Traveler", email: "taylor@example.com" }),
+      };
+    }
+    if (url.endsWith("/announcements") && options.method === "POST") {
+      return {
+        ok: true,
+        text: async () => JSON.stringify({ announcement: { id: 9, ...JSON.parse(options.body) } }),
+      };
+    }
+    return {
+      ok: true,
+      text: async () => JSON.stringify({ items: [], totalItems: 0 }),
+    };
+  });
+
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: /Post an ad/ }));
+
+  await userEvent.type(screen.getByRole("combobox", { name: "Starting city" }), "Ber");
+  fireEvent.click(await screen.findByRole("option", { name: "Berlin, Germany" }));
+  await userEvent.type(screen.getByRole("combobox", { name: "Destination city" }), "Pra");
+  fireEvent.click(await screen.findByRole("option", { name: "Prague, Czechia" }));
+  fireEvent.click(screen.getByRole("button", { name: "Add stop" }));
+  await userEvent.type(screen.getByRole("combobox", { name: "Stop address" }), "Dres");
+  fireEvent.click(await screen.findByRole("option", { name: "Dresden, Germany" }));
+
+  expect(screen.queryByLabelText(/latitude|longitude/i)).not.toBeInTheDocument();
+  await userEvent.type(screen.getByLabelText("Give your route a title"), "Berlin parcel trip");
+  fireEvent.change(screen.getByLabelText("Leaving"), { target: { value: "2026-10-30T10:00" } });
+  fireEvent.change(screen.getByLabelText("Arriving by"), { target: { value: "2026-10-30T15:00" } });
+  fireEvent.click(screen.getByRole("button", { name: "Publish ad" }));
+
+  await waitFor(() => {
+    const createRequest = window.fetch.mock.calls.find(
+      ([url, options]) => String(url).endsWith("/announcements") && options.method === "POST",
+    );
+    expect(createRequest).toBeDefined();
+    expect(JSON.parse(createRequest[1].body)).toEqual(expect.objectContaining({
+      postingPlace: "Berlin, Germany",
+      postingLatitude: 52.52,
+      postingLongitude: 13.405,
+      receptionPlace: "Prague, Czechia",
+      receptionLatitude: 50.0755,
+      receptionLongitude: 14.4378,
+      stops: [{ address: "Dresden, Germany", latitude: 51.0504, longitude: 13.7373, position: 0 }],
+    }));
+  });
+});
+
 test("clears optional profile fields and sends null values to the API", async () => {
   window.sessionStorage.setItem("wayline.accessToken", "test-token");
   window.fetch.mockImplementation(async (url, options = {}) => {
