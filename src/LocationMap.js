@@ -60,8 +60,17 @@ export default function LocationMap({ locations, activeKey, onMapPick }) {
     if (!map || !markerLayer) return;
 
     markerLayer.clearLayers();
-    locations.forEach(({ key, label, location }) => {
-      if (!location) return;
+    const mappedLocations = locations.filter(({ location }) => location);
+    const routeCoordinates = mappedLocations.map(({ location }) => [
+      location.latitude,
+      location.longitude,
+    ]);
+
+    if (routeCoordinates.length > 1) {
+      L.polyline(routeCoordinates, { color: "#438b91", weight: 3, opacity: 0.8 }).addTo(markerLayer);
+    }
+
+    mappedLocations.forEach(({ key, label, location }) => {
       const popupContent = document.createElement("span");
       popupContent.textContent = label;
       const marker = L.marker(
@@ -71,24 +80,38 @@ export default function LocationMap({ locations, activeKey, onMapPick }) {
       marker.addTo(markerLayer);
     });
 
-    const activeLocation = locations.find(({ key, location }) => key === activeKey && location)?.location;
-    if (!activeLocation) return;
-    const activeLocationView = `${activeKey}:${activeLocation.latitude}:${activeLocation.longitude}`;
-    if (lastViewRef.current === activeLocationView) return;
-    lastViewRef.current = activeLocationView;
+    const locationsView = JSON.stringify(mappedLocations.map(({ key, location }) => [
+      key,
+      location.latitude,
+      location.longitude,
+      location.bounds,
+    ]));
+    if (lastViewRef.current === locationsView) return;
+    if (!mappedLocations.length) {
+      lastViewRef.current = locationsView;
+      return;
+    }
 
-    if (activeLocation.bounds?.length === 4 && map.getSize().x > 0 && map.getSize().y > 0) {
-      const [west, south, east, north] = activeLocation.bounds;
+    if (map.getSize().x <= 0 || map.getSize().y <= 0) return;
+    lastViewRef.current = locationsView;
+    if (mappedLocations.length > 1) {
+      map.fitBounds(routeCoordinates, { padding: [32, 32], maxZoom: 12 });
+      return;
+    }
+
+    const { latitude, longitude, bounds } = mappedLocations[0].location;
+    if (bounds?.length === 4 && bounds.every(Number.isFinite)) {
+      const [west, south, east, north] = bounds;
       map.fitBounds([[south, west], [north, east]], { padding: [24, 24], maxZoom: 12 });
     } else {
-      map.setView([activeLocation.latitude, activeLocation.longitude], Math.max(map.getZoom(), 12));
+      map.setView([latitude, longitude], Math.max(map.getZoom(), 12));
     }
   }, [locations, activeKey]);
 
   return (
     <div className="location-map-wrap">
       <div className="location-map" ref={containerRef} role="application" aria-label="OpenStreetMap place picker" />
-      <p className="location-map-help">Click the map to set the active location. The highlighted marker shows which field will be updated.</p>
+      <p className="location-map-help">The line connects your route locations. Click the map to set the active location; its highlighted marker shows which field will be updated.</p>
     </div>
   );
 }

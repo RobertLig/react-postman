@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import L from "leaflet";
 import App from "./App";
 
 beforeEach(() => {
@@ -76,6 +77,8 @@ test("shows parcel photos only for ads requesting a courier", async () => {
 });
 
 test("selects geocoded cities and stops without exposing coordinate inputs", async () => {
+  const supportsSvg = L.Browser.svg;
+  L.Browser.svg = true;
   window.sessionStorage.setItem("wayline.accessToken", "test-token");
   window.fetch.mockImplementation(async (input, options = {}) => {
     const url = String(input);
@@ -130,6 +133,9 @@ test("selects geocoded cities and stops without exposing coordinate inputs", asy
   await userEvent.type(screen.getByRole("combobox", { name: "Stop address" }), "Dres");
   fireEvent.click(await screen.findByRole("option", { name: "Dresden, Germany" }));
 
+  expect(document.querySelectorAll(".location-map-marker")).toHaveLength(3);
+  expect(document.querySelector(".leaflet-overlay-pane path.leaflet-interactive")).toBeInTheDocument();
+  L.Browser.svg = supportsSvg;
   expect(screen.queryByLabelText(/latitude|longitude/i)).not.toBeInTheDocument();
   await userEvent.type(screen.getByLabelText("Give your route a title"), "Berlin parcel trip");
   fireEvent.change(screen.getByLabelText("Leaving"), { target: { value: "2026-10-30T10:00" } });

@@ -1294,12 +1294,12 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
   };
   const mapLocations = [
     { key: "origin", label: `Starting city: ${form.postingPlace}`, location: locations.origin },
-    { key: "destination", label: `Destination city: ${form.receptionPlace}`, location: locations.destination },
     ...stops.map((stop, index) => ({
       key: stop.id,
       label: `Stop ${index + 1}: ${stop.address}`,
       location: stop.location,
     })),
+    { key: "destination", label: `Destination city: ${form.receptionPlace}`, location: locations.destination },
   ];
   const activeLocationLabel = activeLocationKey === "origin"
     ? "Starting city"
