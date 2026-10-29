@@ -25,7 +25,8 @@ beforeEach(() => {
 test("renders and loads route listings", async () => {
   render(<App />);
 
-  expect(screen.getByRole("heading", { name: /good journeys/i })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: /send it with someone going your way/i })).toBeInTheDocument();
+  expect(screen.getByText(/parcel delivery—not ride-sharing/i)).toBeInTheDocument();
   expect(await screen.findByText("Berlin to Prague")).toBeInTheDocument();
   await waitFor(() => expect(window.fetch).toHaveBeenCalledWith(
     expect.stringContaining("/announcements?page=0&size=12"),
@@ -133,4 +134,30 @@ test("defaults country from locale, allows changing country, and saves internati
     expect(update).toBeDefined();
     expect(JSON.parse(update[1].body).phone).toBe("+49301234567");
   });
+});
+
+test("prefills an existing international phone number in profile settings", async () => {
+  window.sessionStorage.setItem("wayline.accessToken", "test-token");
+  window.fetch.mockImplementation(async (url) => ({
+    ok: true,
+    text: async () => JSON.stringify(url.includes("/users/me")
+      ? {
+          id: 3,
+          name: "Taylor Traveler",
+          email: "taylor@example.com",
+          phone: "+48123456789",
+        }
+      : { items: [], totalItems: 0 }),
+  }));
+
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: /Taylor Traveler/ }));
+
+  await waitFor(() => {
+    expect(screen.getByLabelText(/Phone number/).value.replace(/\D/g, "")).toContain("48123456789");
+  });
+  expect(document.querySelector(".selected-flag")).toHaveAttribute(
+    "title",
+    "Poland: + 48",
+  );
 });

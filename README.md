@@ -1,12 +1,15 @@
 # Wayline frontend
 
 Wayline is a React interface for the Quarkus API in `../quarkus-demo/myapp`.
-It supports email and Google sign-in, email verification and password reset,
-browsing/searching routes, route and profile photo uploads, route management,
-direct messages with attachments/reactions/live updates, member block controls,
-and a role-gated support inbox for administrators. Profile phone numbers use a
-country-aware input and are saved in international format; the initial country
-comes from the browser locale.
+It connects people who need a parcel delivered with travelers already heading
+that way and willing to carry it. Members can post an ad looking for a courier
+or offer to deliver a parcel; Wayline is for parcel delivery, not ride-sharing.
+The frontend also supports email and Google sign-in, email verification and
+password reset, browsing/searching delivery ads, route and profile photo
+uploads, route management, direct messages with attachments/reactions/live
+updates, member block controls, and a role-gated support inbox for
+administrators. Profile phone numbers use a country-aware input and are saved
+in international format; the initial country comes from the browser locale.
 
 ## Run locally
 

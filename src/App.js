@@ -32,6 +32,10 @@ function toInternationalPhone(value, dialCode) {
   return `+${digits}`;
 }
 
+function getPhoneInputValue(value) {
+  return value ? value.replace(/\D/g, "") : "";
+}
+
 function Icon({ name, size = 20 }) {
   const paths = {
     arrow: <><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></>,
@@ -78,7 +82,7 @@ function formatDate(value, options = { month: "short", day: "numeric" }) {
 }
 
 function announcementTitle(announcement) {
-  return announcement.translations?.[0]?.title || "A journey worth sharing";
+  return announcement.translations?.[0]?.title || "A delivery along the way";
 }
 
 function announcementDescription(announcement) {
@@ -442,13 +446,13 @@ function App() {
           <span>wayline<span className="brand-period">.</span></span>
         </a>
         <nav className="main-nav" aria-label="Main navigation">
-          <button className={page === "explore" ? "nav-link active" : "nav-link"} onClick={() => setPage("explore")}>Explore routes</button>
+          <button className={page === "explore" ? "nav-link active" : "nav-link"} onClick={() => setPage("explore")}>Find deliveries</button>
           <button className={page === "messages" ? "nav-link active" : "nav-link"} onClick={() => token ? setPage("messages") : setAuthOpen(true)}>Messages{conversations.some((item) => item.unreadCount > 0) && <span className="unread-dot" />}</button>
         </nav>
         <div className="topbar-actions">
           {user ? (
             <>
-              <button className="post-button" onClick={() => setPage("post")}><Icon name="plus" size={17} /> Post a route</button>
+              <button className="post-button" onClick={() => setPage("post")}><Icon name="plus" size={17} /> Post an ad</button>
               <button className="profile-button" onClick={() => setPage("profile")} title="Profile settings">
                 <span className="avatar">{user.photoUrl ? <img src={user.photoUrl} alt="" /> : (user.name || user.email || "Y").slice(0, 1).toUpperCase()}</span>
                 <span className="profile-name">{user.name || "Account"}</span>
@@ -471,14 +475,14 @@ function App() {
           <section className="hero">
             <div className="hero-copy">
               <div className="eyebrow"><span className="eyebrow-line" /> A better way to get there</div>
-              <h1>Good journeys<br />are <span>better shared.</span></h1>
-              <p>Find someone heading your way. Send a parcel, share a ride, and make every trip count.</p>
-              <div className="hero-proof"><span className="proof-check"><Icon name="check" size={13} /></span><span>One good connection can change a journey.</span></div>
+              <h1>Send it with<br />someone <span>going your way.</span></h1>
+              <p>Need a parcel delivered, or already traveling and willing to carry one? Connect here for parcel delivery—not ride-sharing.</p>
+              <div className="hero-proof"><span className="proof-check"><Icon name="check" size={13} /></span><span>Connect senders with travelers already on the way.</span></div>
             </div>
             <div className="hero-art" aria-hidden="true">
               <div className="art-sun" />
               <div className="art-route"><span /><span /><span /></div>
-              <div className="art-card art-card-one"><span className="art-icon"><Icon name="box" size={17} /></span><span><b>Same direction</b><small>One less empty seat</small></span><Icon name="check" size={16} /></div>
+              <div className="art-card art-card-one"><span className="art-icon"><Icon name="box" size={17} /></span><span><b>Same direction</b><small>A parcel along the way</small></span><Icon name="check" size={16} /></div>
               <div className="art-card art-card-two"><span className="art-avatar">M</span><span><b>Meet the community</b><small>Good things travel</small></span></div>
               <div className="art-label">A little closer, together <span>✦</span></div>
             </div>
@@ -502,25 +506,25 @@ function App() {
             </label>
             <div className="filter-field">
               <Icon name="route" size={19} />
-              <label htmlFor="route-type">Route type</label>
+              <label htmlFor="route-type">Ad type</label>
               <select id="route-type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
-                <option value="all">All routes</option>
-                <option value="sender">Need a courier</option>
-                <option value="courier">Offering a route</option>
+                <option value="all">All ads</option>
+                <option value="sender">Needs a courier</option>
+                <option value="courier">Can deliver a parcel</option>
               </select>
             </div>
-            <button className="search-button" onClick={loadAnnouncements}><Icon name="search" size={18} /><span>Find a route</span></button>
+            <button className="search-button" onClick={loadAnnouncements}><Icon name="search" size={18} /><span>Find a delivery</span></button>
           </section>
 
           <section className="listings-section">
             <div className="section-heading">
-              <div><div className="eyebrow section-eyebrow">THE COMMUNITY BOARD</div><h2>Routes with room for you</h2><p>Discover people and parcels going places.</p></div>
-              <div className="results-count">{totalItems ? `${totalItems} ${totalItems === 1 ? "route" : "routes"}` : "New routes, every day"} <span className="count-dot" /></div>
+              <div><div className="eyebrow section-eyebrow">THE COMMUNITY BOARD</div><h2>Parcels going places</h2><p>Find someone to deliver your parcel, or offer to carry one.</p></div>
+              <div className="results-count">{totalItems ? `${totalItems} ${totalItems === 1 ? "ad" : "ads"}` : "New delivery ads, every day"} <span className="count-dot" /></div>
             </div>
 
             {announcementError && <div className="inline-error" role="alert">{announcementError}<button onClick={loadAnnouncements}>Try again</button></div>}
             {loadingAnnouncements ? (
-              <div className="listing-grid" aria-label="Loading routes">{[1, 2, 3].map((item) => <div className="listing-skeleton" key={item} />)}</div>
+              <div className="listing-grid" aria-label="Loading delivery ads">{[1, 2, 3].map((item) => <div className="listing-skeleton" key={item} />)}</div>
             ) : announcements.length > 0 ? (
               <div className="listing-grid">
                 {announcements.map((announcement, index) => (
@@ -535,9 +539,9 @@ function App() {
             ) : (
               <div className="empty-state">
                 <span className="empty-icon"><Icon name="route" size={25} /></span>
-                <h3>{announcementError ? "We couldn’t load routes" : "The road is open"}</h3>
-                <p>{announcementError ? "Check that the API is running, then try again." : "No routes match just yet. Try another search, or be the first to post one."}</p>
-                {!announcementError && <button className="outline-button" onClick={() => token ? setPage("post") : setAuthOpen(true)}>Post a route <Icon name="arrow" size={16} /></button>}
+                <h3>{announcementError ? "We couldn’t load delivery ads" : "The road is open"}</h3>
+                <p>{announcementError ? "Check that the API is running, then try again." : "No delivery ads match just yet. Try another search, or be the first to post one."}</p>
+                {!announcementError && <button className="outline-button" onClick={() => token ? setPage("post") : setAuthOpen(true)}>Post an ad <Icon name="arrow" size={16} /></button>}
               </div>
             )}
             {!loadingAnnouncements && totalPages > 1 && <div className="pagination" aria-label="Route pages">
@@ -549,13 +553,13 @@ function App() {
 
           <section className="bottom-cta">
             <div className="cta-mark"><Icon name="spark" size={24} /></div>
-            <div><h2>Have a little room to spare?</h2><p>Turn the trip you’re already making into something good.</p></div>
-            <button className="cta-button" onClick={() => token ? setPage("post") : setAuthOpen(true)}>Share your route <Icon name="arrow" size={17} /></button>
+            <div><h2>Already heading somewhere?</h2><p>Offer to carry a parcel on a trip you’re already making.</p></div>
+            <button className="cta-button" onClick={() => token ? setPage("post") : setAuthOpen(true)}>Offer delivery <Icon name="arrow" size={17} /></button>
           </section>
         </main>
       )}
 
-      {page === "post" && <PostRoute token={token} user={user} onRequireAuth={() => setAuthOpen(true)} onPosted={(created, failures = []) => { setPage("explore"); setSelectedAnnouncement(created); loadAnnouncements(); setNotice(failures.length ? `Your route is live, but some photos failed: ${failures.map((failure) => `${failure.name}: ${failure.message}`).join("; ")}` : "Your route is live. Let’s see where it goes."); }} />}
+      {page === "post" && <PostRoute token={token} user={user} onRequireAuth={() => setAuthOpen(true)} onPosted={(created, failures = []) => { setPage("explore"); setSelectedAnnouncement(created); loadAnnouncements(); setNotice(failures.length ? `Your ad is live, but some photos failed: ${failures.map((failure) => `${failure.name}: ${failure.message}`).join("; ")}` : "Your ad is live. Let’s see where it goes."); }} />}
 
       {page === "profile" && <ProfilePage
         token={token}
@@ -705,7 +709,7 @@ function AnnouncementCard({ announcement, index, onOpen }) {
     <article className={`route-card card-${index % 3}`}>
       <button className="card-open" onClick={onOpen} aria-label={`View ${title}`} />
       <div className={`route-card-art ${routeClass}`}>
-        <span className="route-category"><span />{needsCourier ? "Looking for a courier" : "Offering a route"}</span>
+        <span className="route-category"><span />{needsCourier ? "Parcel needs a courier" : "Can deliver a parcel"}</span>
         <span className="route-art-symbol"><Icon name={needsCourier ? "box" : "route"} size={28} /></span>
         <div className="route-city route-city-start">{announcement.postingPlace || "Starting point"}<span /></div>
         <div className="route-dotted" />
@@ -714,7 +718,7 @@ function AnnouncementCard({ announcement, index, onOpen }) {
       <div className="route-card-content">
         <div className="route-card-meta"><span><Icon name="calendar" size={15} />{formatDate(announcement.postingDateTime)}</span><span><Icon name="pin" size={15} />{announcement.stops?.length || 0} stops</span></div>
         <h3>{title}</h3>
-        <p>{announcementDescription(announcement) || `${needsCourier ? "Looking for a kind traveler to help this journey along." : "There may be room for one more along the way."}`}</p>
+        <p>{announcementDescription(announcement) || `${needsCourier ? "Looking for a traveler to deliver this parcel." : "Offering to carry a parcel along this route."}`}</p>
         <div className="route-card-bottom"><span className="avatar avatar-small">W</span><span className="poster-caption">Wayline member</span><button className="card-arrow" onClick={onOpen} aria-label="See route details"><Icon name="arrow" size={17} /></button></div>
       </div>
     </article>
@@ -726,8 +730,8 @@ function ProfilePage({ token, user, onSave, onSignOut, onDeleteAccount, onRequir
   const [email, setEmail] = useState(user?.email || "");
   const [ageRange, setAgeRange] = useState(user?.ageRange || "");
   const [gender, setGender] = useState(user?.gender || "");
-  const [phone, setPhone] = useState(user?.phone || "");
-  const [phoneCountry, setPhoneCountry] = useState(getDefaultPhoneCountry);
+  const [phone, setPhone] = useState(() => getPhoneInputValue(user?.phone));
+  const [phoneCountry] = useState(getDefaultPhoneCountry);
   const [phoneDialCode, setPhoneDialCode] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -740,19 +744,16 @@ function ProfilePage({ token, user, onSave, onSignOut, onDeleteAccount, onRequir
     setEmail(user?.email || "");
     setAgeRange(user?.ageRange || "");
     setGender(user?.gender || "");
-    setPhone(user?.phone || "");
+    setPhone(getPhoneInputValue(user?.phone));
   }, [user]);
 
   const handlePhoneChange = (value, country) => {
     setPhone(value);
-    if (country?.countryCode) setPhoneCountry(country.countryCode);
     if (country?.dialCode) setPhoneDialCode(country.dialCode);
   };
 
   const handlePhoneMount = (value, country) => {
-    if (country?.countryCode) setPhoneCountry(country.countryCode);
     if (country?.dialCode) setPhoneDialCode(country.dialCode);
-    if (user?.phone && !user.phone.startsWith("+")) setPhone(value);
   };
 
   if (!token || !user) return <main className="post-page"><div className="post-auth"><span className="empty-icon"><Icon name="user" size={25} /></span><h1>Your Wayline starts here.</h1><p>Sign in to see and update your account details.</p><button className="dialog-primary" onClick={onRequireAuth}>Continue to sign in <Icon name="arrow" size={17} /></button></div></main>;
@@ -1017,7 +1018,7 @@ function AnnouncementDialog({ announcement, token, onClose, onContact, onChange,
     <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className="detail-dialog" role="dialog" aria-modal="true" aria-labelledby="detail-title">
         <button className="modal-close" onClick={onClose} aria-label="Close route details"><Icon name="close" size={20} /></button>
-        <div className={`detail-banner ${needsCourier ? "sender" : "courier"}`}><span className="route-category"><span />{needsCourier ? "Looking for a courier" : "Offering a route"}</span><Icon name={needsCourier ? "box" : "route"} size={40} /></div>
+        <div className={`detail-banner ${needsCourier ? "sender" : "courier"}`}><span className="route-category"><span />{needsCourier ? "Parcel needs a courier" : "Can deliver a parcel"}</span><Icon name={needsCourier ? "box" : "route"} size={40} /></div>
         <div className="detail-body">
           <div className="detail-eyebrow">{formatDate(announcement.postingDateTime, { weekday: "long", month: "long", day: "numeric" })}</div>
           {editing ? <form className="announcement-edit-form" onSubmit={saveAnnouncement}><label>Route title<input value={editTitle} maxLength="150" required onChange={(event) => setEditTitle(event.target.value)} /></label><label>Description<textarea value={editDescription} rows="4" maxLength="2000" onChange={(event) => setEditDescription(event.target.value)} /></label><div><button className="outline-button" type="button" onClick={() => setEditing(false)}>Cancel</button><button className="dialog-primary" disabled={photoBusy}>{photoBusy ? "Saving..." : "Save route"}<Icon name="check" size={15} /></button></div></form> : <h2 id="detail-title">{announcementTitle(announcement)}</h2>}
@@ -1153,7 +1154,7 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
   const [stops, setStops] = useState([]);
   const [photos, setPhotos] = useState([]);
 
-  if (!token || !user) return <main className="post-page"><div className="post-auth"><span className="empty-icon"><Icon name="user" size={25} /></span><h1>Every good route starts somewhere.</h1><p>Sign in or create an account to share your route with the community.</p><button className="dialog-primary" onClick={onRequireAuth}>Continue to sign in <Icon name="arrow" size={17} /></button></div></main>;
+  if (!token || !user) return <main className="post-page"><div className="post-auth"><span className="empty-icon"><Icon name="user" size={25} /></span><h1>Every delivery starts somewhere.</h1><p>Sign in or create an account to post an ad or offer to carry a parcel.</p><button className="dialog-primary" onClick={onRequireAuth}>Continue to sign in <Icon name="arrow" size={17} /></button></div></main>;
 
   const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const submit = async (event) => {
@@ -1223,11 +1224,11 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
 
   return (
     <main className="post-page">
-      <div className="post-intro"><div className="eyebrow section-eyebrow">MAKE ROOM FOR GOOD</div><h1>Share your route.</h1><p>Tell the community where you’re heading. The right person might be going the same way.</p></div>
+      <div className="post-intro"><div className="eyebrow section-eyebrow">PARCELS, ON THEIR WAY</div><h1>Post a delivery ad.</h1><p>Offer to carry a parcel on a trip you’re taking, or find someone to deliver something for you.</p></div>
       <form className="post-form" onSubmit={submit}>
-        <fieldset><legend>What kind of route is this?</legend><div className="type-options">
-          <button type="button" className={`type-option ${form.type === "courier" ? "chosen" : ""}`} onClick={() => update("type", "courier")}><span className="type-option-icon"><Icon name="route" size={20} /></span><span><b>I’m offering a route</b><small>I have room to carry or share.</small></span><span className="radio-dot" /></button>
-          <button type="button" className={`type-option ${form.type === "sender" ? "chosen" : ""}`} onClick={() => update("type", "sender")}><span className="type-option-icon"><Icon name="box" size={20} /></span><span><b>I need a courier</b><small>I need something taken along.</small></span><span className="radio-dot" /></button>
+        <fieldset><legend>What would you like to do?</legend><div className="type-options">
+          <button type="button" className={`type-option ${form.type === "courier" ? "chosen" : ""}`} onClick={() => update("type", "courier")}><span className="type-option-icon"><Icon name="route" size={20} /></span><span><b>I can deliver a parcel</b><small>I’m traveling this route and can carry something.</small></span><span className="radio-dot" /></button>
+          <button type="button" className={`type-option ${form.type === "sender" ? "chosen" : ""}`} onClick={() => update("type", "sender")}><span className="type-option-icon"><Icon name="box" size={20} /></span><span><b>I need a parcel delivered</b><small>I have something to send along this route.</small></span><span className="radio-dot" /></button>
         </div></fieldset>
         <div className="form-section"><h2>Where are you going?</h2><div className="form-grid">
           <label>Starting city<input required value={form.postingPlace} onChange={(event) => update("postingPlace", event.target.value)} placeholder="e.g. Berlin, Germany" /></label>
@@ -1266,7 +1267,7 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
           {photos.length > 0 && <div className="selected-files">{photos.map((file, index) => <div key={`${file.name}-${file.lastModified}`}><span><Icon name="box" size={15} />{file.name}<small>{(file.size / (1024 * 1024)).toFixed(1)} MB</small></span><button type="button" aria-label={`Remove ${file.name}`} onClick={() => setPhotos((current) => current.filter((_, photoIndex) => photoIndex !== index))}><Icon name="close" size={15} /></button></div>)}</div>}
         </div>
         {error && <div className="form-error" role="alert">{error}</div>}
-        <div className="post-submit"><span><Icon name="check" size={16} />Your contact details stay private.</span><button className="dialog-primary" disabled={busy}>{busy ? "Publishing..." : "Publish route"}<Icon name="arrow" size={17} /></button></div>
+        <div className="post-submit"><span><Icon name="check" size={16} />Your contact details stay private.</span><button className="dialog-primary" disabled={busy}>{busy ? "Publishing..." : "Publish ad"}<Icon name="arrow" size={17} /></button></div>
       </form>
     </main>
   );
