@@ -35,7 +35,10 @@ project; its dev profile allows `http://localhost:3000`.
 The route-posting form uses Photon place search with OpenStreetMap data for
 starting cities, destinations, and stops. Select a suggestion to fill in the
 coordinates required by the API; manually typed place names are not submitted
-without a matching selection. The default Photon endpoint is free to use
+without a matching selection. Place names are requested in the browser's
+preferred language (using the first entry in its language preferences, with
+the browser's primary language as a fallback); Photon returns a local name
+when no translation is available. The default Photon endpoint is free to use
 without a key, but it is a shared community service without an availability
 guarantee. For higher traffic, host Photon yourself and set
 `REACT_APP_GEOCODING_URL` to that instance's API URL. Place results are

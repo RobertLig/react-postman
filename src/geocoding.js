@@ -1,6 +1,25 @@
 const PHOTON_ENDPOINT =
   process.env.REACT_APP_GEOCODING_URL || "https://photon.komoot.io/api/";
 
+function getPreferredLanguage() {
+  const preferences = [
+    ...(Array.isArray(navigator.languages) ? navigator.languages : []),
+    navigator.language,
+  ];
+
+  for (const preference of preferences) {
+    if (typeof preference !== "string" || !preference.trim()) continue;
+    try {
+      const language = new Intl.Locale(preference).language;
+      if (language && language !== "und") return language;
+    } catch {
+      continue;
+    }
+  }
+
+  return "en";
+}
+
 function formatPlaceLabel(properties) {
   const name = properties.name || properties.street || properties.locality;
   const locality = properties.city || properties.locality || properties.district;
@@ -11,7 +30,7 @@ export async function searchLocations(query, { signal } = {}) {
   const url = new URL(PHOTON_ENDPOINT);
   url.searchParams.set("q", query);
   url.searchParams.set("limit", "6");
-  url.searchParams.set("lang", (navigator.language || "en").split("-")[0]);
+  url.searchParams.set("lang", getPreferredLanguage());
 
   const response = await fetch(url, { signal });
   if (!response.ok) {
