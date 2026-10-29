@@ -44,6 +44,15 @@ guarantee. For higher traffic, host Photon yourself and set
 `REACT_APP_GEOCODING_URL` to that instance's API URL. Place results are
 attributed to OpenStreetMap contributors in the interface.
 
+The posting form also includes an interactive Leaflet map using OpenStreetMap
+tiles. Focus or select a starting city, destination, or stop to make it the
+active map field; clicking the map reverse-geocodes that point into that field.
+Map clicks use the same Photon endpoint and language preference as typeahead.
+The map uses the community OSM tile service, which is free under its usage
+policy but has no service guarantee; for higher traffic, choose a tile provider
+or host tiles that supports your usage. OpenStreetMap map data and tiles are
+attributed in the map.
+
 Uploads use the API's short-lived signed S3 URLs. Route photos and avatars are
 JPG/PNG images up to 5 MB; each route allows three photos. Message attachments
 are limited to 5 MB and the MIME types allowed by the API, with up to ten

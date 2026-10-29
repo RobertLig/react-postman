@@ -12,6 +12,8 @@ import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 import "./App.css";
 import LocationAutocomplete from "./LocationAutocomplete";
+import LocationMap from "./LocationMap";
+import { reverseGeocodeLocation } from "./geocoding";
 
 const GOOGLE_CLIENT_ID =
   process.env.REACT_APP_GOOGLE_CLIENT_ID ||
@@ -1118,7 +1120,6 @@ function AuthDialog({ initialMode, resetToken, onClose, onAuthenticated, onNotic
       setBusy(false);
     }
   };
-
   return (
     <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title">
@@ -1147,7 +1148,9 @@ function AuthDialog({ initialMode, resetToken, onClose, onAuthenticated, onNotic
 function PostRoute({ token, user, onRequireAuth, onPosted }) {
   const [form, setForm] = useState({ type: "courier", title: "", description: "", postingPlace: "", receptionPlace: "", postingDateTime: "", receptionDateTime: "" });
   const [locations, setLocations] = useState({ origin: null, destination: null });
+  const [activeLocationKey, setActiveLocationKey] = useState("origin");
   const [error, setError] = useState("");
+  const [mapError, setMapError] = useState("");
   const [busy, setBusy] = useState(false);
   const [includeWeight, setIncludeWeight] = useState(false);
   const [weight, setWeight] = useState("");
@@ -1155,14 +1158,62 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
   const [dimensions, setDimensions] = useState({ width: "", height: "", length: "" });
   const [stops, setStops] = useState([]);
   const [photos, setPhotos] = useState([]);
+  const nextStopId = useRef(1);
+  const reverseGeocodeController = useRef(null);
+
+  useEffect(() => () => reverseGeocodeController.current?.abort(), []);
 
   if (!token || !user) return <main className="post-page"><div className="post-auth"><span className="empty-icon"><Icon name="user" size={25} /></span><h1>Every delivery starts somewhere.</h1><p>Sign in or create an account to post an ad or offer to carry a parcel.</p><button className="dialog-primary" onClick={onRequireAuth}>Continue to sign in <Icon name="arrow" size={17} /></button></div></main>;
 
   const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
-  const updateLocation = (field, key, value, location) => {
+  const updateLocation = (field, key, value, location, preserveMapRequest = false) => {
+    if (!preserveMapRequest) reverseGeocodeController.current?.abort();
     update(field, value);
     setLocations((current) => ({ ...current, [key]: location }));
+    setActiveLocationKey(key);
+    setMapError("");
     if (location) setError("");
+  };
+  const updateMapLocation = (key, location) => {
+    if (key === "origin") {
+      updateLocation("postingPlace", key, location.label, location, true);
+    } else if (key === "destination") {
+      updateLocation("receptionPlace", key, location.label, location, true);
+    } else {
+      setStops((current) => current.map((stop) => stop.id === key
+        ? { ...stop, address: location.label, location }
+        : stop));
+      setActiveLocationKey(key);
+      setMapError("");
+      setError("");
+    }
+  };
+  const handleMapPick = async ({ latitude, longitude }) => {
+    const key = activeLocationKey;
+    reverseGeocodeController.current?.abort();
+    const controller = new AbortController();
+    reverseGeocodeController.current = controller;
+    const fallbackLocation = {
+      id: `pin/${latitude},${longitude}`,
+      label: `Pinned location (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`,
+      latitude,
+      longitude,
+    };
+    updateMapLocation(key, fallbackLocation);
+
+    try {
+      const location = await reverseGeocodeLocation(latitude, longitude, { signal: controller.signal });
+      if (!controller.signal.aborted) {
+        updateMapLocation(key, location
+          ? { ...location, latitude, longitude }
+          : fallbackLocation);
+      }
+    } catch (failure) {
+      if (failure.name !== "AbortError" && !controller.signal.aborted) {
+        updateMapLocation(key, fallbackLocation);
+        setMapError(`${failure.message || "Could not look up this place."} The map pin coordinates are still selected.`);
+      }
+    }
   };
   const submit = async (event) => {
     event.preventDefault();
@@ -1241,6 +1292,20 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
       setBusy(false);
     }
   };
+  const mapLocations = [
+    { key: "origin", label: `Starting city: ${form.postingPlace}`, location: locations.origin },
+    { key: "destination", label: `Destination city: ${form.receptionPlace}`, location: locations.destination },
+    ...stops.map((stop, index) => ({
+      key: stop.id,
+      label: `Stop ${index + 1}: ${stop.address}`,
+      location: stop.location,
+    })),
+  ];
+  const activeLocationLabel = activeLocationKey === "origin"
+    ? "Starting city"
+    : activeLocationKey === "destination"
+      ? "Destination city"
+      : `Stop ${stops.findIndex((stop) => stop.id === activeLocationKey) + 1}`;
 
   return (
     <main className="post-page">
@@ -1256,6 +1321,7 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
             value={form.postingPlace}
             selectedLocation={locations.origin}
             required
+            onActivate={() => setActiveLocationKey("origin")}
             onChange={(value, location) => updateLocation("postingPlace", "origin", value, location)}
           />
           <LocationAutocomplete
@@ -1263,11 +1329,16 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
             value={form.receptionPlace}
             selectedLocation={locations.destination}
             required
+            onActivate={() => setActiveLocationKey("destination")}
             onChange={(value, location) => updateLocation("receptionPlace", "destination", value, location)}
           />
           <label>Leaving<input required type="datetime-local" value={form.postingDateTime} onChange={(event) => update("postingDateTime", event.target.value)} /></label>
           <label>Arriving by<input required type="datetime-local" value={form.receptionDateTime} onChange={(event) => update("receptionDateTime", event.target.value)} /></label>
-        </div><p className="field-hint">Choose a suggestion to add its location automatically. Search uses Photon and © OpenStreetMap contributors.</p></div>
+        </div><p className="field-hint">Choose a suggestion to add its location automatically. Search uses Photon and © OpenStreetMap contributors.</p>
+          <div className="location-map-heading"><b>Pick a location on the map</b><span>Active field: {activeLocationLabel}</span></div>
+          <LocationMap locations={mapLocations} activeKey={activeLocationKey} onMapPick={handleMapPick} />
+          {mapError && <p className="form-error location-map-error" role="alert">{mapError}</p>}
+        </div>
         <div className="form-section"><h2>A few more details</h2><div className="form-grid">
           <label className="full-span">Give your route a title<input required maxLength={150} value={form.title} onChange={(event) => update("title", event.target.value)} placeholder="A short, friendly headline" /></label>
           <label className="full-span">Anything else people should know?<textarea rows="4" maxLength={2000} value={form.description} onChange={(event) => update("description", event.target.value)} placeholder="Share a little more about the journey..." /></label>
@@ -1275,8 +1346,19 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
         <div className="form-section"><h2>Stops and parcel details</h2>
           <label className="terms-field weight-toggle"><input type="checkbox" checked={includeDimensions} onChange={(event) => setIncludeDimensions(event.target.checked)} /><span>I can share maximum parcel dimensions</span></label>
           {includeDimensions && <div className="form-grid dimensions-fields"><label>Width (cm)<input type="number" min="0.1" step="0.1" required value={dimensions.width} onChange={(event) => setDimensions({ ...dimensions, width: event.target.value })} /></label><label>Height (cm)<input type="number" min="0.1" step="0.1" required value={dimensions.height} onChange={(event) => setDimensions({ ...dimensions, height: event.target.value })} /></label><label>Length (cm)<input type="number" min="0.1" step="0.1" required value={dimensions.length} onChange={(event) => setDimensions({ ...dimensions, length: event.target.value })} /></label></div>}
-          <div className="stops-heading"><p>Add optional pickup or meeting points along the way.</p><button type="button" className="outline-button" disabled={stops.length >= 5} onClick={() => setStops((current) => [...current, { address: "", location: null }])}><Icon name="plus" size={14} />Add stop</button></div>
-          {stops.map((stop, index) => <div className="stop-row" key={`stop-${index}`}><LocationAutocomplete label="Stop address" value={stop.address} selectedLocation={stop.location} required onChange={(value, location) => setStops((current) => current.map((item, stopIndex) => stopIndex === index ? { ...item, address: value, location } : item))} /><button type="button" className="remove-stop" aria-label="Remove stop" onClick={() => setStops((current) => current.filter((_, stopIndex) => stopIndex !== index))}><Icon name="close" size={15} /></button></div>)}
+          <div className="stops-heading"><p>Add optional pickup or meeting points along the way.</p><button type="button" className="outline-button" disabled={stops.length >= 5} onClick={() => {
+            const id = `stop-${nextStopId.current++}`;
+            setStops((current) => [...current, { id, address: "", location: null }]);
+            setActiveLocationKey(id);
+          }}><Icon name="plus" size={14} />Add stop</button></div>
+          {stops.map((stop) => <div className="stop-row" key={stop.id}><LocationAutocomplete label="Stop address" value={stop.address} selectedLocation={stop.location} required onActivate={() => setActiveLocationKey(stop.id)} onChange={(value, location) => {
+            reverseGeocodeController.current?.abort();
+            setActiveLocationKey(stop.id);
+            setStops((current) => current.map((item) => item.id === stop.id ? { ...item, address: value, location } : item));
+          }} /><button type="button" className="remove-stop" aria-label="Remove stop" onClick={() => {
+            setStops((current) => current.filter((item) => item.id !== stop.id));
+            if (activeLocationKey === stop.id) setActiveLocationKey("origin");
+          }}><Icon name="close" size={15} /></button></div>)}
         </div>
         {form.type === "sender" && <div className="form-section"><h2>Photos <span className="optional-label">optional · up to 3 JPG or PNG, 5 MB each</span></h2>
           <label className="photo-picker"> <Icon name="plus" size={17} /> Add route photos<input type="file" accept="image/jpeg,image/png" multiple disabled={photos.length >= 3} onChange={(event) => {

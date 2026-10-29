@@ -122,9 +122,11 @@ test("selects geocoded cities and stops without exposing coordinate inputs", asy
 
   await userEvent.type(screen.getByRole("combobox", { name: "Starting city" }), "Ber");
   fireEvent.click(await screen.findByRole("option", { name: "Berlin, Germany" }));
+  expect(document.querySelector(".location-map-marker.active")).toBeInTheDocument();
   await userEvent.type(screen.getByRole("combobox", { name: "Destination city" }), "Pra");
   fireEvent.click(await screen.findByRole("option", { name: "Prague, Czechia" }));
   fireEvent.click(screen.getByRole("button", { name: "Add stop" }));
+  expect(screen.getByText("Active field: Stop 1")).toBeInTheDocument();
   await userEvent.type(screen.getByRole("combobox", { name: "Stop address" }), "Dres");
   fireEvent.click(await screen.findByRole("option", { name: "Dresden, Germany" }));
 

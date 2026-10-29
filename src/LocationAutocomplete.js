@@ -6,6 +6,7 @@ export default function LocationAutocomplete({
   value,
   selectedLocation,
   onChange,
+  onActivate,
   required = false,
 }) {
   const inputId = useId().replace(/:/g, "");
@@ -97,7 +98,10 @@ export default function LocationAutocomplete({
           value={value}
           onChange={(event) => onChange(event.target.value, null)}
           onKeyDown={handleKeyDown}
-          onFocus={() => setFocused(true)}
+          onFocus={() => {
+            setFocused(true);
+            onActivate?.();
+          }}
           onBlur={() => setFocused(false)}
           placeholder="Type a city name"
         />
