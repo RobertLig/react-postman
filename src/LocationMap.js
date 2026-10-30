@@ -4,20 +4,47 @@ import "leaflet/dist/leaflet.css";
 
 const INITIAL_VIEW = [25, 0];
 
-function markerStyle(active) {
+function hasCoordinate(value) {
+  return value !== null && value !== undefined && value !== ""
+    && Number.isFinite(Number(value));
+}
+
+function fitLocationView(map, locations, readOnly) {
+  if (!locations.length || map.getSize().x <= 0 || map.getSize().y <= 0) return;
+  if (locations.length > 1) {
+    const coordinates = locations.map(({ location }) => [
+      location.latitude,
+      location.longitude,
+    ]);
+    const padding = readOnly ? [16, 16] : [32, 32];
+    map.fitBounds(coordinates, { padding, maxZoom: 13 });
+    return;
+  }
+
+  const { latitude, longitude, bounds } = locations[0].location;
+  if (bounds?.length === 4 && bounds.every(Number.isFinite)) {
+    const [west, south, east, north] = bounds;
+    map.fitBounds([[south, west], [north, east]], { padding: [24, 24], maxZoom: 12 });
+  } else {
+    map.setView([latitude, longitude], Math.max(map.getZoom(), 12));
+  }
+}
+
+function markerStyle(active, key) {
   const size = active ? 22 : 18;
   return L.divIcon({
-    className: `location-map-marker${active ? " active" : ""}`,
+    className: `location-map-marker${active ? " active" : ""}${key ? ` ${key}` : ""}`,
     html: "",
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   });
 }
 
-export default function LocationMap({ locations, activeKey, onMapPick }) {
+export default function LocationMap({ locations, activeKey, onMapPick, readOnly = false }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markerLayerRef = useRef(null);
+  const locationsRef = useRef([]);
   const onMapPickRef = useRef(onMapPick);
   const lastViewRef = useRef("");
 
@@ -28,23 +55,36 @@ export default function LocationMap({ locations, activeKey, onMapPick }) {
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return undefined;
 
-    const map = L.map(containerRef.current, { scrollWheelZoom: false }).setView(INITIAL_VIEW, 2);
+    const map = L.map(containerRef.current, {
+      scrollWheelZoom: false,
+      dragging: !readOnly,
+      touchZoom: !readOnly,
+      doubleClickZoom: !readOnly,
+      boxZoom: !readOnly,
+      keyboard: !readOnly,
+      zoomControl: !readOnly,
+    }).setView(INITIAL_VIEW, 2);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
     const markerLayer = L.layerGroup().addTo(map);
 
-    map.on("click", (event) => {
-      onMapPickRef.current({
-        latitude: event.latlng.lat,
-        longitude: event.latlng.lng,
+    if (!readOnly) {
+      map.on("click", (event) => {
+        onMapPickRef.current({
+          latitude: event.latlng.lat,
+          longitude: event.latlng.lng,
+        });
       });
-    });
+    }
 
     mapRef.current = map;
     markerLayerRef.current = markerLayer;
-    const invalidateTimeout = window.setTimeout(() => map.invalidateSize(), 0);
+    const invalidateTimeout = window.setTimeout(() => {
+      map.invalidateSize();
+      fitLocationView(map, locationsRef.current, readOnly);
+    }, 0);
 
     return () => {
       window.clearTimeout(invalidateTimeout);
@@ -52,7 +92,7 @@ export default function LocationMap({ locations, activeKey, onMapPick }) {
       mapRef.current = null;
       markerLayerRef.current = null;
     };
-  }, []);
+  }, [readOnly]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -60,14 +100,36 @@ export default function LocationMap({ locations, activeKey, onMapPick }) {
     if (!map || !markerLayer) return;
 
     markerLayer.clearLayers();
-    const mappedLocations = locations.filter(({ location }) => location);
+    const mappedLocations = locations.filter(({ location }) => location
+      && hasCoordinate(location.latitude)
+      && hasCoordinate(location.longitude))
+      .map((item) => ({
+        ...item,
+        location: {
+          ...item.location,
+          latitude: Number(item.location.latitude),
+          longitude: Number(item.location.longitude),
+        },
+      }));
+    locationsRef.current = mappedLocations;
     const routeCoordinates = mappedLocations.map(({ location }) => [
       location.latitude,
       location.longitude,
     ]);
 
     if (routeCoordinates.length > 1) {
-      L.polyline(routeCoordinates, { color: "#438b91", weight: 3, opacity: 0.8 }).addTo(markerLayer);
+      L.polyline(routeCoordinates, {
+        color: "#fff",
+        weight: 8,
+        opacity: 0.95,
+        ...(readOnly ? { interactive: false } : {}),
+      }).addTo(markerLayer);
+      L.polyline(routeCoordinates, {
+        color: "#438b91",
+        weight: 5,
+        opacity: 1,
+        ...(readOnly ? { interactive: false } : {}),
+      }).addTo(markerLayer);
     }
 
     mappedLocations.forEach(({ key, label, location }) => {
@@ -75,8 +137,12 @@ export default function LocationMap({ locations, activeKey, onMapPick }) {
       popupContent.textContent = label;
       const marker = L.marker(
         [location.latitude, location.longitude],
-        { icon: markerStyle(key === activeKey) },
-      ).bindPopup(popupContent);
+        {
+          icon: markerStyle(key === activeKey, readOnly ? key : ""),
+          interactive: !readOnly,
+        },
+      );
+      if (!readOnly) marker.bindPopup(popupContent);
       marker.addTo(markerLayer);
     });
 
@@ -94,24 +160,13 @@ export default function LocationMap({ locations, activeKey, onMapPick }) {
 
     if (map.getSize().x <= 0 || map.getSize().y <= 0) return;
     lastViewRef.current = locationsView;
-    if (mappedLocations.length > 1) {
-      map.fitBounds(routeCoordinates, { padding: [32, 32], maxZoom: 12 });
-      return;
-    }
-
-    const { latitude, longitude, bounds } = mappedLocations[0].location;
-    if (bounds?.length === 4 && bounds.every(Number.isFinite)) {
-      const [west, south, east, north] = bounds;
-      map.fitBounds([[south, west], [north, east]], { padding: [24, 24], maxZoom: 12 });
-    } else {
-      map.setView([latitude, longitude], Math.max(map.getZoom(), 12));
-    }
-  }, [locations, activeKey]);
+    fitLocationView(map, mappedLocations, readOnly);
+  }, [locations, activeKey, readOnly]);
 
   return (
     <div className="location-map-wrap">
-      <div className="location-map" ref={containerRef} role="application" aria-label="OpenStreetMap place picker" />
-      <p className="location-map-help">The line connects your route locations. Click the map to set the active location; its highlighted marker shows which field will be updated.</p>
+      <div className={`location-map${readOnly ? " read-only" : ""}`} ref={containerRef} role={readOnly ? "img" : "application"} aria-label={readOnly ? "Route map" : "OpenStreetMap place picker"} />
+      {!readOnly && <p className="location-map-help">The line connects your route locations. Click the map to set the active location; its highlighted marker shows which field will be updated.</p>}
     </div>
   );
 }

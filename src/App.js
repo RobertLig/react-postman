@@ -15,7 +15,11 @@ import LocationAutocomplete from "./LocationAutocomplete";
 import LocationMap from "./LocationMap";
 import SortableList from "./SortableList";
 import { reverseGeocodeLocation } from "./geocoding";
-import { getMeasurementSystem } from "./measurement";
+import {
+  formatStoredDimensions,
+  formatStoredWeight,
+  getMeasurementSystem,
+} from "./measurement";
 
 const GOOGLE_CLIENT_ID =
   process.env.REACT_APP_GOOGLE_CLIENT_ID ||
@@ -92,6 +96,12 @@ function announcementTitle(announcement) {
 
 function announcementDescription(announcement) {
   return announcement.translations?.[0]?.description || "";
+}
+
+function hasCoordinates(latitude, longitude) {
+  const isCoordinate = (value) => value !== null && value !== undefined && value !== ""
+    && Number.isFinite(Number(value));
+  return isCoordinate(latitude) && isCoordinate(longitude);
 }
 
 function isAllowedAttachmentType(type) {
@@ -1037,6 +1047,25 @@ function AnnouncementDialog({ announcement, token, onClose, onContact, onChange,
           {String(user?.id) === String(announcement.userId) && photos.length < 3 && <label className="add-photo-control"><Icon name="plus" size={15} />{photoBusy ? "Uploading..." : "Add parcel photos"}<input type="file" accept="image/jpeg,image/png" disabled={photoBusy} onChange={(event) => { addPhoto(event.target.files?.[0]); event.target.value = ""; }} /></label>}
           {photoError && <div className="form-error" role="alert">{photoError}</div>}
           <div className="detail-route"><span className="route-point start" /><div><b>{announcement.postingPlace}</b><small>Starting point</small></div><span className="detail-route-line" /><span className="route-point end" /><div><b>{announcement.receptionPlace}</b><small>Destination</small></div></div>
+          {hasCoordinates(announcement.postingLatitude, announcement.postingLongitude)
+            && hasCoordinates(announcement.receptionLatitude, announcement.receptionLongitude)
+            && <div className="detail-map-section">
+              <h3>Route overview</h3>
+              <LocationMap
+                readOnly
+                locations={[
+                  { key: "origin", label: `Starting point: ${announcement.postingPlace}`, location: { latitude: Number(announcement.postingLatitude), longitude: Number(announcement.postingLongitude) } },
+                  ...sortStopsByPosition(announcement.stops || [])
+                    .filter(({ stop }) => hasCoordinates(stop.latitude, stop.longitude))
+                    .map(({ stop }, index) => ({
+                      key: `stop-${index + 1}`,
+                      label: `Stop ${index + 1}: ${stop.address}`,
+                      location: { latitude: Number(stop.latitude), longitude: Number(stop.longitude) },
+                    })),
+                  { key: "destination", label: `Destination: ${announcement.receptionPlace}`, location: { latitude: Number(announcement.receptionLatitude), longitude: Number(announcement.receptionLongitude) } },
+                ]}
+              />
+            </div>}
           <div className="detail-schedule">
             {announcement.postingDateTime && <div><small>Leaving</small><time dateTime={announcement.postingDateTime}>{formatDate(announcement.postingDateTime, { weekday: "long", month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}</time></div>}
             {announcement.receptionDateTime && <div><small>Arriving by</small><time dateTime={announcement.receptionDateTime}>{formatDate(announcement.receptionDateTime, { weekday: "long", month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}</time></div>}
@@ -1048,8 +1077,8 @@ function AnnouncementDialog({ announcement, token, onClose, onContact, onChange,
           </div>}
           {!editing && announcementDescription(announcement) && <p className="detail-description">{announcementDescription(announcement)}</p>}
           {(announcement.weight?.value > 0 || announcement.dimensions?.width > 0) && <div className="detail-facts">
-            {announcement.weight?.value > 0 && <span><Icon name="box" size={16} />Up to {announcement.weight.value} {announcement.weight.unit === "imperial" ? "lb" : "kg"}</span>}
-            {announcement.dimensions?.width > 0 && <span><Icon name="box" size={16} />{announcement.dimensions.width} × {announcement.dimensions.height} × {announcement.dimensions.length} {announcement.dimensions.unit === "imperial" ? "in" : "cm"}</span>}
+            {announcement.weight?.value > 0 && <span><Icon name="box" size={16} />Up to {formatStoredWeight(announcement.weight.value)}</span>}
+            {announcement.dimensions?.width > 0 && <span><Icon name="box" size={16} />{formatStoredDimensions(announcement.dimensions)}</span>}
           </div>}
           {String(user?.id) === String(announcement.userId) ? <div className="owner-route-actions"><button className="dialog-primary" onClick={() => setEditing((current) => !current)}><Icon name="user" size={15} />{editing ? "Editing route" : "Edit route"}</button><button className="delete-route-button" disabled={photoBusy} onClick={deleteAnnouncement}>Remove this route</button></div> : <button className="dialog-primary" onClick={onContact}>{user ? "Message about this route" : "Sign in to get in touch"}<Icon name="arrow" size={17} /></button>}
           <p className="dialog-footnote">Keep your conversation on Wayline while you make a plan.</p>

@@ -4,6 +4,10 @@ import L from "leaflet";
 import App from "./App";
 import { getMeasurementSystem } from "./measurement";
 
+afterEach(() => {
+  delete window.navigator.language;
+});
+
 beforeEach(() => {
   window.fetch = jest.fn().mockResolvedValue({
     ok: true,
@@ -48,6 +52,57 @@ test("opens route details from a listing", async () => {
   expect(within(dialog).getByText("Prague")).toBeInTheDocument();
 });
 
+test("shows a non-interactive route map in details when coordinates are available", async () => {
+  const supportsSvg = L.Browser.svg;
+  L.Browser.svg = true;
+  const polyline = jest.spyOn(L, "polyline");
+  jest.spyOn(L.Map.prototype, "getSize").mockReturnValue(L.point(450, 300));
+  const fitBounds = jest.spyOn(L.Map.prototype, "fitBounds");
+  window.fetch.mockResolvedValue({
+    ok: true,
+    text: async () => JSON.stringify({
+      items: [{
+        id: 8,
+        type: "courier",
+        userId: 3,
+        postingPlace: "Berlin",
+        postingLatitude: 52.52,
+        postingLongitude: 13.405,
+        receptionPlace: "Prague",
+        receptionLatitude: 50.0755,
+        receptionLongitude: 14.4378,
+        stops: [{ address: "Dresden, Germany", latitude: 51.0504, longitude: 13.7373, position: 0 }],
+        postingDateTime: "2026-10-28T10:00:00",
+        receptionDateTime: "2026-10-28T15:00:00",
+        translations: [{ title: "Berlin to Prague", description: "" }],
+      }],
+      totalItems: 1,
+    }),
+  });
+
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "View Berlin to Prague" }));
+
+  const dialog = screen.getByRole("dialog", { name: "Berlin to Prague" });
+  expect(within(dialog).getByRole("img", { name: "Route map" })).toBeInTheDocument();
+  await waitFor(() => expect(polyline).toHaveBeenLastCalledWith(
+    [[52.52, 13.405], [51.0504, 13.7373], [50.0755, 14.4378]],
+    { color: "#438b91", weight: 5, opacity: 1, interactive: false },
+  ));
+  expect(fitBounds).toHaveBeenCalledWith(
+    [[52.52, 13.405], [51.0504, 13.7373], [50.0755, 14.4378]],
+    { padding: [16, 16], maxZoom: 13 },
+  );
+  expect(within(dialog).getByText("Route overview")).toBeInTheDocument();
+  expect(dialog.querySelectorAll(".location-map-marker")).toHaveLength(3);
+  expect(dialog.querySelector(".leaflet-control-zoom")).not.toBeInTheDocument();
+
+  polyline.mockRestore();
+  fitBounds.mockRestore();
+  L.Map.prototype.getSize.mockRestore();
+  L.Browser.svg = supportsSvg;
+});
+
 test("shows departure and arrival times and ordered stops in route details", async () => {
   window.fetch.mockResolvedValue({
     ok: true,
@@ -83,6 +138,36 @@ test("shows departure and arrival times and ordered stops in route details", asy
     "1Leipzig, Germany",
     "2Dresden, Germany",
   ]);
+});
+
+test.each([
+  ["en-US", "Up to 22 lb", "3.9 × 7.9 × 11.8 in"],
+  ["pl-PL", "Up to 10 kg", "10 × 20 × 30 cm"],
+])("formats stored metric parcel limits for the %s browser locale", async (locale, expectedWeight, expectedDimensions) => {
+  Object.defineProperty(window.navigator, "language", { configurable: true, value: locale });
+  window.fetch.mockResolvedValue({
+    ok: true,
+    text: async () => JSON.stringify({
+      items: [{
+        id: 8,
+        type: "courier",
+        userId: 3,
+        postingPlace: "Berlin",
+        receptionPlace: "Prague",
+        weight: { value: 10, unit: "metric" },
+        dimensions: { width: 10, height: 20, length: 30, unit: "metric" },
+        translations: [{ title: "Berlin to Prague", description: "" }],
+      }],
+      totalItems: 1,
+    }),
+  });
+
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "View Berlin to Prague" }));
+
+  const dialog = screen.getByRole("dialog", { name: "Berlin to Prague" });
+  expect(within(dialog).getByText(expectedWeight)).toBeInTheDocument();
+  expect(within(dialog).getByText(expectedDimensions)).toBeInTheDocument();
 });
 
 test("keeps the photo gallery in the saved position order after sorting", async () => {
@@ -324,7 +409,7 @@ test("selects geocoded cities and stops without exposing coordinate inputs", asy
   fireEvent.click(screen.getByRole("button", { name: "Move stop 2 up" }));
   await waitFor(() => expect(polyline).toHaveBeenLastCalledWith(
     [[52.52, 13.405], [51.3397, 12.3731], [51.0504, 13.7373], [50.0755, 14.4378]],
-    { color: "#438b91", weight: 3, opacity: 0.8 },
+    { color: "#438b91", weight: 5, opacity: 1 },
   ));
   polyline.mockRestore();
   L.Browser.svg = supportsSvg;

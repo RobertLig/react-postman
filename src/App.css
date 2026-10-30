@@ -146,6 +146,14 @@ h1, h2, h3, p { margin-top: 0; }
 .detail-route b, .detail-route small { display: block; }
 .detail-route b { overflow: hidden; color: #385363; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .detail-route small { margin-top: 4px; color: #89979d; font-size: 9px; }
+.detail-map-section { margin: 15px 0; }
+.detail-map-section h3 { margin: 0 0 8px; color: #526977; font-size: 10px; }
+.detail-map-section .location-map-wrap { margin-top: 0; }
+.detail-map-section .location-map { height: 300px; cursor: default; }
+.detail-map-section .leaflet-container { cursor: default; }
+.detail-map-section .location-map-marker.origin { background: #5da895; }
+.detail-map-section .location-map-marker.destination { background: #498b9b; }
+.detail-map-section .location-map-marker[class*="stop-"] { background: #d16d50; }
 .detail-schedule { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 12px 0; }
 .detail-schedule > div { display: grid; gap: 4px; padding: 10px 12px; border-radius: 8px; background: #f7f9f9; }
 .detail-schedule small { color: #89979d; font-size: 9px; }
@@ -485,6 +493,7 @@ h1, h2, h3, p { margin-top: 0; }
   .form-grid label.full-span { grid-column: auto; }
   .post-submit { align-items: flex-start; flex-direction: column; }
   .location-map { height: 270px; }
+  .detail-map-section .location-map { height: 250px; }
   .location-map-heading { align-items: flex-start; flex-direction: column; gap: 4px; }
   .messages-page { min-height: calc(100vh - 130px); padding-top: 30px; }
   .inbox { height: min(650px, calc(100vh - 220px)); min-height: 370px; grid-template-columns: 125px 1fr; }
