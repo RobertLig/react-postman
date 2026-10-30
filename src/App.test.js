@@ -52,6 +52,62 @@ test("opens route details from a listing", async () => {
   expect(within(dialog).getByText("Prague")).toBeInTheDocument();
 });
 
+test("truncates long route place names without losing their full values", async () => {
+  const startingPlace = "A very long starting place name that should not overflow the route details layout";
+  const destination = "A very long destination place name that should not overflow the route details layout";
+  window.fetch.mockResolvedValue({
+    ok: true,
+    text: async () => JSON.stringify({
+      items: [{
+        id: 8,
+        type: "courier",
+        userId: 3,
+        postingPlace: startingPlace,
+        receptionPlace: destination,
+        translations: [{ title: "Long route", description: "" }],
+      }],
+      totalItems: 1,
+    }),
+  });
+
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "View Long route" }));
+
+  const dialog = screen.getByRole("dialog", { name: "Long route" });
+  const startingValue = within(dialog).getByTitle(startingPlace);
+  const destinationValue = within(dialog).getByTitle(destination);
+  expect(startingValue).toHaveTextContent(startingPlace);
+  expect(destinationValue).toHaveTextContent(destination);
+});
+
+test("keeps long place names contained in route cards and exposes their full text", async () => {
+  const startingPlace = "Gdansk, Pomeranian Voivodeship, Poland";
+  const destination = "Paris, Île-de-France, France";
+  window.fetch.mockResolvedValue({
+    ok: true,
+    text: async () => JSON.stringify({
+      items: [{
+        id: 8,
+        type: "courier",
+        userId: 3,
+        postingPlace: startingPlace,
+        receptionPlace: destination,
+        translations: [{ title: "Long route", description: "" }],
+      }],
+      totalItems: 1,
+    }),
+  });
+
+  render(<App />);
+
+  const startLabel = await screen.findByTitle(startingPlace);
+  const destinationLabel = screen.getByTitle(destination);
+  expect(startLabel).toHaveClass("route-city-name");
+  expect(destinationLabel).toHaveClass("route-city-name");
+  expect(startLabel).toHaveTextContent(startingPlace);
+  expect(destinationLabel).toHaveTextContent(destination);
+});
+
 test("prefills and saves every route field from the details edit form", async () => {
   const supportsSvg = L.Browser.svg;
   L.Browser.svg = true;
@@ -472,6 +528,12 @@ test("selects geocoded cities and stops without exposing coordinate inputs", asy
 
   render(<App />);
   fireEvent.click(await screen.findByRole("button", { name: /Post an ad/ }));
+
+  expect(screen.getByRole("heading", { name: "Where are you going?" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /I need a parcel delivered/ }));
+  expect(screen.getByRole("heading", { name: "Where does your parcel need to go?" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /I can deliver a parcel/ }));
+  expect(screen.getByRole("heading", { name: "Where are you going?" })).toBeInTheDocument();
 
   await userEvent.type(screen.getByRole("combobox", { name: "Starting city" }), "Ber");
   fireEvent.click(await screen.findByRole("option", { name: "Berlin, Germany" }));

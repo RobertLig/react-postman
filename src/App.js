@@ -781,9 +781,9 @@ function AnnouncementCard({ announcement, index, onOpen }) {
       <div className={`route-card-art ${routeClass}`}>
         <span className="route-category"><span />{needsCourier ? "Parcel needs a courier" : "Can deliver a parcel"}</span>
         <span className="route-art-symbol"><Icon name={needsCourier ? "box" : "route"} size={28} /></span>
-        <div className="route-city route-city-start">{announcement.postingPlace || "Starting point"}<span /></div>
+        <div className="route-city route-city-start"><span className="route-city-name" title={announcement.postingPlace || "Starting point"}>{announcement.postingPlace || "Starting point"}</span><span className="route-city-marker" /></div>
         <div className="route-dotted" />
-        <div className="route-city route-city-end">{announcement.receptionPlace || "Destination"}<span /></div>
+        <div className="route-city route-city-end"><span className="route-city-name" title={announcement.receptionPlace || "Destination"}>{announcement.receptionPlace || "Destination"}</span><span className="route-city-marker" /></div>
       </div>
       <div className="route-card-content">
         <div className="route-card-meta"><span><Icon name="calendar" size={15} />{formatDate(announcement.postingDateTime)}</span><span><Icon name="pin" size={15} />{announcement.stops?.length || 0} stops</span></div>
@@ -1231,7 +1231,7 @@ function AnnouncementDialog({ announcement, token, onClose, onContact, onChange,
           {photos.length > 0 && <div className="photo-gallery">{photos.map((photo, index) => <div className="detail-photo" key={photo.id}><img src={photo.url} alt={`Route ${index + 1}`} />{String(user?.id) === String(announcement.userId) && <div className="photo-actions">{photo.position === 0 ? <span>Cover photo</span> : <button disabled={photoBusy} onClick={() => setMainPhoto(photo)}>Make cover</button>}<button disabled={photoBusy || index === 0} title="Move photo earlier" onClick={() => movePhoto(index, -1)} aria-label="Move photo earlier">↑</button><button disabled={photoBusy || index === photos.length - 1} title="Move photo later" onClick={() => movePhoto(index, 1)} aria-label="Move photo later">↓</button><button disabled={photoBusy} onClick={() => removePhoto(photo)} aria-label="Remove photo"><Icon name="close" size={14} /></button></div>}</div>)}</div>}
           {String(user?.id) === String(announcement.userId) && photos.length < 3 && <label className="add-photo-control"><Icon name="plus" size={15} />{photoBusy ? "Uploading..." : "Add parcel photos"}<input type="file" accept="image/jpeg,image/png" disabled={photoBusy} onChange={(event) => { addPhoto(event.target.files?.[0]); event.target.value = ""; }} /></label>}
           {photoError && <div className="form-error" role="alert">{photoError}</div>}
-          {!editing && <div className="detail-route"><span className="route-point start" /><div><b>{announcement.postingPlace}</b><small>Starting point</small></div><span className="detail-route-line" /><span className="route-point end" /><div><b>{announcement.receptionPlace}</b><small>Destination</small></div></div>}
+          {!editing && <div className="detail-route"><span className="route-point start" /><div><b title={announcement.postingPlace}>{announcement.postingPlace}</b><small>Starting point</small></div><span className="detail-route-line" /><span className="route-point end" /><div><b title={announcement.receptionPlace}>{announcement.receptionPlace}</b><small>Destination</small></div></div>}
           {!editing && hasCoordinates(announcement.postingLatitude, announcement.postingLongitude)
             && hasCoordinates(announcement.receptionLatitude, announcement.receptionLongitude)
             && <div className="detail-map-section">
@@ -1581,7 +1581,7 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
           <button type="button" className={`type-option ${form.type === "courier" ? "chosen" : ""}`} onClick={() => update("type", "courier")}><span className="type-option-icon"><Icon name="route" size={20} /></span><span><b>I can deliver a parcel</b><small>I’m traveling this route and can carry something.</small></span><span className="radio-dot" /></button>
           <button type="button" className={`type-option ${form.type === "sender" ? "chosen" : ""}`} onClick={() => update("type", "sender")}><span className="type-option-icon"><Icon name="box" size={20} /></span><span><b>I need a parcel delivered</b><small>I have something to send along this route.</small></span><span className="radio-dot" /></button>
         </div></fieldset>
-        <div className="form-section"><h2>Where are you going?</h2><div className="form-grid">
+        <div className="form-section"><h2>{form.type === "sender" ? "Where does your parcel need to go?" : "Where are you going?"}</h2><div className="form-grid">
           <LocationAutocomplete
             label="Starting city"
             value={form.postingPlace}
