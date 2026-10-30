@@ -104,6 +104,56 @@ function hasCoordinates(latitude, longitude) {
   return isCoordinate(latitude) && isCoordinate(longitude);
 }
 
+function dateTimeLocalValue(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 16);
+}
+
+function coordinateLocation(label, latitude, longitude) {
+  return hasCoordinates(latitude, longitude)
+    ? { id: `saved/${latitude},${longitude}`, label, latitude: Number(latitude), longitude: Number(longitude) }
+    : null;
+}
+
+function roundedMeasurement(value, factor) {
+  const converted = Number(value) * factor;
+  return String(Math.round(converted * 10) / 10);
+}
+
+function announcementEditForm(announcement) {
+  const measurementSystem = getMeasurementSystem();
+  const weightFactor = measurementSystem === "imperial" ? 2.2046226218 : 1;
+  const dimensionFactor = measurementSystem === "imperial" ? 1 / 2.54 : 1;
+  return {
+    title: announcementTitle(announcement),
+    description: announcementDescription(announcement),
+    postingPlace: announcement.postingPlace || "",
+    receptionPlace: announcement.receptionPlace || "",
+    postingDateTime: dateTimeLocalValue(announcement.postingDateTime),
+    receptionDateTime: dateTimeLocalValue(announcement.receptionDateTime),
+    origin: coordinateLocation(announcement.postingPlace, announcement.postingLatitude, announcement.postingLongitude),
+    destination: coordinateLocation(announcement.receptionPlace, announcement.receptionLatitude, announcement.receptionLongitude),
+    weight: announcement.weight?.value ? roundedMeasurement(announcement.weight.value, weightFactor) : "",
+    dimensions: {
+      width: announcement.dimensions?.width ? roundedMeasurement(announcement.dimensions.width, dimensionFactor) : "",
+      height: announcement.dimensions?.height ? roundedMeasurement(announcement.dimensions.height, dimensionFactor) : "",
+      length: announcement.dimensions?.length ? roundedMeasurement(announcement.dimensions.length, dimensionFactor) : "",
+    },
+    includeWeight: Boolean(announcement.weight?.value),
+    includeDimensions: Boolean(announcement.dimensions?.width || announcement.dimensions?.height || announcement.dimensions?.length),
+    stops: sortStopsByPosition(announcement.stops || []).map(({ stop }, index) => ({
+      key: `saved-stop-${stop.id || index}`,
+      serverId: stop.id,
+      address: stop.address || "",
+      location: coordinateLocation(stop.address, stop.latitude, stop.longitude),
+    })),
+  };
+}
+
 function isAllowedAttachmentType(type) {
   return new Set([
     "image/jpeg",
@@ -917,14 +967,61 @@ function ProfilePage({ token, user, onSave, onSignOut, onDeleteAccount, onRequir
 }
 
 function AnnouncementDialog({ announcement, token, onClose, onContact, onChange, onDelete, user }) {
-  const needsCourier = announcement.type === "sender";
   const [photos, setPhotos] = useState(() => sortPhotosByPosition(announcement.photos));
   const [photoError, setPhotoError] = useState("");
   const [photoBusy, setPhotoBusy] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [editTitle, setEditTitle] = useState(announcementTitle(announcement));
-  const [editDescription, setEditDescription] = useState(announcementDescription(announcement));
+  const [editForm, setEditForm] = useState(() => announcementEditForm(announcement));
+  const [activeLocationKey, setActiveLocationKey] = useState("origin");
+  const [mapError, setMapError] = useState("");
+  const reverseGeocodeController = useRef(null);
+  const nextStopId = useRef(1);
+  const measurementSystem = getMeasurementSystem();
+  const needsCourier = announcement.type === "sender";
   useEffect(() => setPhotos(sortPhotosByPosition(announcement.photos)), [announcement]);
+  useEffect(() => () => reverseGeocodeController.current?.abort(), []);
+
+  const updateEditForm = (key, value) => setEditForm((current) => ({ ...current, [key]: value }));
+  const updateEditLocation = (field, key, value, location) => {
+    setEditForm((current) => ({ ...current, [field]: value, [key]: location }));
+    setActiveLocationKey(key);
+    setMapError("");
+  };
+  const handleEditMapPick = async ({ latitude, longitude }) => {
+    const key = activeLocationKey;
+    reverseGeocodeController.current?.abort();
+    const controller = new AbortController();
+    reverseGeocodeController.current = controller;
+    const fallbackLocation = {
+      id: `pin/${latitude},${longitude}`,
+      label: `Pinned location (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`,
+      latitude,
+      longitude,
+    };
+    const updateMapLocation = (location) => {
+      if (key === "origin") updateEditLocation("postingPlace", key, location.label, location);
+      else if (key === "destination") updateEditLocation("receptionPlace", key, location.label, location);
+      else {
+        setEditForm((current) => ({
+          ...current,
+          stops: current.stops.map((stop) => stop.key === key
+            ? { ...stop, address: location.label, location }
+            : stop),
+        }));
+        setMapError("");
+      }
+    };
+    updateMapLocation(fallbackLocation);
+    try {
+      const location = await reverseGeocodeLocation(latitude, longitude, { signal: controller.signal });
+      if (!controller.signal.aborted) updateMapLocation(location ? { ...location, latitude, longitude } : fallbackLocation);
+    } catch (failure) {
+      if (failure.name !== "AbortError" && !controller.signal.aborted) {
+        updateMapLocation(fallbackLocation);
+        setMapError(`${failure.message || "Could not look up this place."} The map pin coordinates are still selected.`);
+      }
+    }
+  };
 
   const refreshPhotos = (updated) => {
     const ordered = sortPhotosByPosition(updated);
@@ -1014,18 +1111,57 @@ function AnnouncementDialog({ announcement, token, onClose, onContact, onChange,
   };
   const saveAnnouncement = async (event) => {
     event.preventDefault();
+    if (!editForm.origin) {
+      setPhotoError("Select a starting city from the suggestions.");
+      return;
+    }
+    if (!editForm.destination) {
+      setPhotoError("Select a destination city from the suggestions.");
+      return;
+    }
+    if (editForm.stops.some((stop) => !stop.location)) {
+      setPhotoError("Select a suggested place for each stop, or remove that stop.");
+      return;
+    }
     setPhotoBusy(true);
     setPhotoError("");
     try {
       const translations = announcement.translations?.length
         ? announcement.translations.map((translation, index) => index === 0
-          ? { ...translation, title: editTitle.trim(), description: editDescription.trim() }
+          ? { ...translation, title: editForm.title.trim(), description: editForm.description.trim() }
           : translation)
-        : [{ language: navigator.language?.toLowerCase().startsWith("pl") ? "pl" : "en", title: editTitle.trim(), description: editDescription.trim() }];
+        : [{ language: navigator.language?.toLowerCase().startsWith("pl") ? "pl" : "en", title: editForm.title.trim(), description: editForm.description.trim() }];
       const response = await apiRequest(`/announcements/${announcement.id}`, {
         method: "PUT",
         token,
-        body: { ...announcement, translations },
+        body: {
+          ...announcement,
+          postingPlace: editForm.postingPlace,
+          postingLatitude: editForm.origin.latitude,
+          postingLongitude: editForm.origin.longitude,
+          receptionPlace: editForm.receptionPlace,
+          receptionLatitude: editForm.destination.latitude,
+          receptionLongitude: editForm.destination.longitude,
+          postingDateTime: editForm.postingDateTime,
+          receptionDateTime: editForm.receptionDateTime,
+          translations,
+          weight: editForm.includeWeight && editForm.weight
+            ? { value: Number(editForm.weight), unit: measurementSystem }
+            : null,
+          dimensions: editForm.includeDimensions ? {
+            width: Number(editForm.dimensions.width),
+            height: Number(editForm.dimensions.height),
+            length: Number(editForm.dimensions.length),
+            unit: measurementSystem,
+          } : null,
+          stops: editForm.stops.map((stop, position) => ({
+            ...(stop.serverId !== undefined ? { id: stop.serverId } : {}),
+            address: stop.address,
+            latitude: stop.location.latitude,
+            longitude: stop.location.longitude,
+            position,
+          })),
+        },
       });
       onChange(response.announcement);
       setEditing(false);
@@ -1035,19 +1171,68 @@ function AnnouncementDialog({ announcement, token, onClose, onContact, onChange,
       setPhotoBusy(false);
     }
   };
+  const editMapLocations = [
+    { key: "origin", label: `Starting city: ${editForm.postingPlace}`, location: editForm.origin },
+    ...editForm.stops.map((stop, index) => ({
+      key: stop.key,
+      label: `Stop ${index + 1}: ${stop.address}`,
+      location: stop.location,
+    })),
+    { key: "destination", label: `Destination city: ${editForm.receptionPlace}`, location: editForm.destination },
+  ];
+  const activeLocationLabel = activeLocationKey === "origin"
+    ? "Starting city"
+    : activeLocationKey === "destination"
+      ? "Destination city"
+      : `Stop ${editForm.stops.findIndex((stop) => stop.key === activeLocationKey) + 1}`;
   return (
     <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section className="detail-dialog" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+      <section className={`detail-dialog${editing ? " route-editing" : ""}`} role="dialog" aria-modal="true" aria-labelledby="detail-title">
         <button className="modal-close" onClick={onClose} aria-label="Close route details"><Icon name="close" size={20} /></button>
         <div className={`detail-banner ${needsCourier ? "sender" : "courier"}`}><span className="route-category"><span />{needsCourier ? "Parcel needs a courier" : "Can deliver a parcel"}</span><Icon name={needsCourier ? "box" : "route"} size={40} /></div>
         <div className="detail-body">
           <div className="detail-eyebrow">{formatDate(announcement.postingDateTime, { weekday: "long", month: "long", day: "numeric" })}</div>
-          {editing ? <form className="announcement-edit-form" onSubmit={saveAnnouncement}><label>Route title<input value={editTitle} maxLength="150" required onChange={(event) => setEditTitle(event.target.value)} /></label><label>Description<textarea value={editDescription} rows="4" maxLength="2000" onChange={(event) => setEditDescription(event.target.value)} /></label><div><button className="outline-button" type="button" onClick={() => setEditing(false)}>Cancel</button><button className="dialog-primary" disabled={photoBusy}>{photoBusy ? "Saving..." : "Save route"}<Icon name="check" size={15} /></button></div></form> : <h2 id="detail-title">{announcementTitle(announcement)}</h2>}
+          {editing ? <form className="post-form route-edit-form" onSubmit={saveAnnouncement}>
+            <h2 id="detail-title">Edit route</h2>
+            <fieldset><legend>Ad type</legend><div className="type-option chosen route-type-display"><span className="type-option-icon"><Icon name={announcement.type === "sender" ? "box" : "route"} size={20} /></span><span><b>{announcement.type === "sender" ? "I need a parcel delivered" : "I can deliver a parcel"}</b></span></div></fieldset>
+            <div className="form-section"><h2>{needsCourier ? "Where does your parcel need to go?" : "Where are you going?"}</h2><div className="form-grid">
+              <LocationAutocomplete label="Starting city" value={editForm.postingPlace} selectedLocation={editForm.origin} required onActivate={() => setActiveLocationKey("origin")} onChange={(value, location) => updateEditLocation("postingPlace", "origin", value, location)} />
+              <LocationAutocomplete label="Destination city" value={editForm.receptionPlace} selectedLocation={editForm.destination} required onActivate={() => setActiveLocationKey("destination")} onChange={(value, location) => updateEditLocation("receptionPlace", "destination", value, location)} />
+              <label>Leaving<input required type="datetime-local" value={editForm.postingDateTime} onChange={(event) => updateEditForm("postingDateTime", event.target.value)} /></label>
+              <label>Arriving by<input required type="datetime-local" value={editForm.receptionDateTime} onChange={(event) => updateEditForm("receptionDateTime", event.target.value)} /></label>
+            </div><p className="field-hint">Choose a suggestion to add its location automatically. Search uses Photon and © OpenStreetMap contributors.</p>
+              <div className="location-map-heading"><b>Pick a location on the map</b><span>Active field: {activeLocationLabel}</span></div>
+              <LocationMap locations={editMapLocations} activeKey={activeLocationKey} onMapPick={handleEditMapPick} />
+              {mapError && <p className="form-error location-map-error" role="alert">{mapError}</p>}
+            </div>
+            <div className="form-section"><h2>A few more details</h2><div className="form-grid">
+              <label className="full-span">Give your route a title<input required maxLength={150} value={editForm.title} onChange={(event) => updateEditForm("title", event.target.value)} /></label>
+              <label className="full-span">Anything else people should know?<textarea rows="4" maxLength={2000} value={editForm.description} onChange={(event) => updateEditForm("description", event.target.value)} /></label>
+            </div><label className="terms-field weight-toggle"><input type="checkbox" checked={editForm.includeWeight} onChange={(event) => updateEditForm("includeWeight", event.target.checked)} /><span>I can share a weight limit</span></label>{editForm.includeWeight && <label className="weight-input">Maximum weight ({measurementSystem === "imperial" ? "lb" : "kg"})<input type="number" min="0.1" step="0.1" value={editForm.weight} onChange={(event) => updateEditForm("weight", event.target.value)} /></label>}</div>
+            <div className="form-section"><h2>Stops and parcel details</h2>
+              <label className="terms-field weight-toggle"><input type="checkbox" checked={editForm.includeDimensions} onChange={(event) => updateEditForm("includeDimensions", event.target.checked)} /><span>I can share maximum parcel dimensions</span></label>
+              {editForm.includeDimensions && <div className="form-grid dimensions-fields"><label>Width ({measurementSystem === "imperial" ? "in" : "cm"})<input type="number" min="0.1" step="0.1" required value={editForm.dimensions.width} onChange={(event) => setEditForm((current) => ({ ...current, dimensions: { ...current.dimensions, width: event.target.value } }))} /></label><label>Height ({measurementSystem === "imperial" ? "in" : "cm"})<input type="number" min="0.1" step="0.1" required value={editForm.dimensions.height} onChange={(event) => setEditForm((current) => ({ ...current, dimensions: { ...current.dimensions, height: event.target.value } }))} /></label><label>Length ({measurementSystem === "imperial" ? "in" : "cm"})<input type="number" min="0.1" step="0.1" required value={editForm.dimensions.length} onChange={(event) => setEditForm((current) => ({ ...current, dimensions: { ...current.dimensions, length: event.target.value } }))} /></label></div>}
+              <div className="stops-heading"><p>Add optional pickup or meeting points; use the arrows to set their order.</p><button type="button" className="outline-button" disabled={editForm.stops.length >= 5} onClick={() => {
+                const key = `edit-stop-${nextStopId.current++}`;
+                setEditForm((current) => ({ ...current, stops: [...current.stops, { key, address: "", location: null }] }));
+                setActiveLocationKey(key);
+              }}><Icon name="plus" size={14} />Add stop</button></div>
+              <SortableList items={editForm.stops} onChange={(stops) => setEditForm((current) => ({ ...current, stops }))} itemLabel="stop" listLabel="Stops in route order" getItemKey={(stop) => stop.key} renderItem={(stop) => (
+                <div className="stop-row"><LocationAutocomplete label="Stop address" value={stop.address} selectedLocation={stop.location} required onActivate={() => setActiveLocationKey(stop.key)} onChange={(value, location) => {
+                  setEditForm((current) => ({ ...current, stops: current.stops.map((item) => item.key === stop.key ? { ...item, address: value, location } : item) }));
+                }} /><button type="button" className="remove-stop" aria-label="Remove stop" onClick={() => {
+                  setEditForm((current) => ({ ...current, stops: current.stops.filter((item) => item.key !== stop.key) }));
+                  if (activeLocationKey === stop.key) setActiveLocationKey("origin");
+                }}><Icon name="close" size={15} /></button></div>
+              )} />
+            </div>
+            <div className="route-edit-actions"><button className="outline-button" type="button" onClick={() => { setEditing(false); setPhotoError(""); setMapError(""); }}>Cancel</button><button className="dialog-primary" disabled={photoBusy}>{photoBusy ? "Saving..." : "Save route"}<Icon name="check" size={15} /></button></div>
+          </form> : <h2 id="detail-title">{announcementTitle(announcement)}</h2>}
           {photos.length > 0 && <div className="photo-gallery">{photos.map((photo, index) => <div className="detail-photo" key={photo.id}><img src={photo.url} alt={`Route ${index + 1}`} />{String(user?.id) === String(announcement.userId) && <div className="photo-actions">{photo.position === 0 ? <span>Cover photo</span> : <button disabled={photoBusy} onClick={() => setMainPhoto(photo)}>Make cover</button>}<button disabled={photoBusy || index === 0} title="Move photo earlier" onClick={() => movePhoto(index, -1)} aria-label="Move photo earlier">↑</button><button disabled={photoBusy || index === photos.length - 1} title="Move photo later" onClick={() => movePhoto(index, 1)} aria-label="Move photo later">↓</button><button disabled={photoBusy} onClick={() => removePhoto(photo)} aria-label="Remove photo"><Icon name="close" size={14} /></button></div>}</div>)}</div>}
           {String(user?.id) === String(announcement.userId) && photos.length < 3 && <label className="add-photo-control"><Icon name="plus" size={15} />{photoBusy ? "Uploading..." : "Add parcel photos"}<input type="file" accept="image/jpeg,image/png" disabled={photoBusy} onChange={(event) => { addPhoto(event.target.files?.[0]); event.target.value = ""; }} /></label>}
           {photoError && <div className="form-error" role="alert">{photoError}</div>}
-          <div className="detail-route"><span className="route-point start" /><div><b>{announcement.postingPlace}</b><small>Starting point</small></div><span className="detail-route-line" /><span className="route-point end" /><div><b>{announcement.receptionPlace}</b><small>Destination</small></div></div>
-          {hasCoordinates(announcement.postingLatitude, announcement.postingLongitude)
+          {!editing && <div className="detail-route"><span className="route-point start" /><div><b>{announcement.postingPlace}</b><small>Starting point</small></div><span className="detail-route-line" /><span className="route-point end" /><div><b>{announcement.receptionPlace}</b><small>Destination</small></div></div>}
+          {!editing && hasCoordinates(announcement.postingLatitude, announcement.postingLongitude)
             && hasCoordinates(announcement.receptionLatitude, announcement.receptionLongitude)
             && <div className="detail-map-section">
               <h3>Route overview</h3>
@@ -1066,21 +1251,21 @@ function AnnouncementDialog({ announcement, token, onClose, onContact, onChange,
                 ]}
               />
             </div>}
-          <div className="detail-schedule">
+          {!editing && <div className="detail-schedule">
             {announcement.postingDateTime && <div><small>Leaving</small><time dateTime={announcement.postingDateTime}>{formatDate(announcement.postingDateTime, { weekday: "long", month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}</time></div>}
             {announcement.receptionDateTime && <div><small>Arriving by</small><time dateTime={announcement.receptionDateTime}>{formatDate(announcement.receptionDateTime, { weekday: "long", month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}</time></div>}
-          </div>
-          {announcement.stops?.length > 0 && <div className="detail-stops">
+          </div>}
+          {!editing && announcement.stops?.length > 0 && <div className="detail-stops">
             <h3>Stops along the way</h3>
             <ol>{sortStopsByPosition(announcement.stops)
               .map(({ stop }, index) => <li key={stop.id || `${stop.position}-${stop.address}`}><span>{index + 1}</span>{stop.address}</li>)}</ol>
           </div>}
           {!editing && announcementDescription(announcement) && <p className="detail-description">{announcementDescription(announcement)}</p>}
-          {(announcement.weight?.value > 0 || announcement.dimensions?.width > 0) && <div className="detail-facts">
+          {!editing && (announcement.weight?.value > 0 || announcement.dimensions?.width > 0) && <div className="detail-facts">
             {announcement.weight?.value > 0 && <span><Icon name="box" size={16} />Up to {formatStoredWeight(announcement.weight.value)}</span>}
             {announcement.dimensions?.width > 0 && <span><Icon name="box" size={16} />{formatStoredDimensions(announcement.dimensions)}</span>}
           </div>}
-          {String(user?.id) === String(announcement.userId) ? <div className="owner-route-actions"><button className="dialog-primary" onClick={() => setEditing((current) => !current)}><Icon name="user" size={15} />{editing ? "Editing route" : "Edit route"}</button><button className="delete-route-button" disabled={photoBusy} onClick={deleteAnnouncement}>Remove this route</button></div> : <button className="dialog-primary" onClick={onContact}>{user ? "Message about this route" : "Sign in to get in touch"}<Icon name="arrow" size={17} /></button>}
+          {String(user?.id) === String(announcement.userId) ? <div className="owner-route-actions">{!editing && <button className="dialog-primary" onClick={() => { setEditForm(announcementEditForm(announcement)); setEditing(true); setPhotoError(""); }}><Icon name="user" size={15} />Edit route</button>}<button className="delete-route-button" disabled={photoBusy} onClick={deleteAnnouncement}>Remove this route</button></div> : <button className="dialog-primary" onClick={onContact}>{user ? "Message about this route" : "Sign in to get in touch"}<Icon name="arrow" size={17} /></button>}
           <p className="dialog-footnote">Keep your conversation on Wayline while you make a plan.</p>
         </div>
       </section>

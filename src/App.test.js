@@ -52,6 +52,88 @@ test("opens route details from a listing", async () => {
   expect(within(dialog).getByText("Prague")).toBeInTheDocument();
 });
 
+test("prefills and saves every route field from the details edit form", async () => {
+  const supportsSvg = L.Browser.svg;
+  L.Browser.svg = true;
+  jest.spyOn(L.Map.prototype, "getSize").mockReturnValue(L.point(450, 300));
+  Object.defineProperty(window.navigator, "language", { configurable: true, value: "pl-PL" });
+  window.sessionStorage.setItem("wayline.accessToken", "test-token");
+  let savedRoute;
+  const announcement = {
+    id: 7,
+    type: "sender",
+    userId: 3,
+    postingPlace: "Berlin",
+    postingLatitude: 52.52,
+    postingLongitude: 13.405,
+    receptionPlace: "Prague",
+    receptionLatitude: 50.0755,
+    receptionLongitude: 14.4378,
+    postingDateTime: "2026-10-28T10:00:00",
+    receptionDateTime: "2026-10-28T15:00:00",
+    weight: { value: 4.999999999999999, unit: "metric" },
+    dimensions: { width: 4.999999999999999, height: 20.00000000001, length: 30.00000000001, unit: "metric" },
+    stops: [{ id: 12, address: "Dresden", latitude: 51.0504, longitude: 13.7373, position: 0 }],
+    translations: [{ title: "Berlin to Prague", description: "Room for a small parcel." }],
+  };
+  window.fetch.mockImplementation(async (input, options = {}) => {
+    const url = String(input);
+    if (url.includes("/users/me")) {
+      return { ok: true, text: async () => JSON.stringify({ id: 3, name: "Taylor Traveler", email: "taylor@example.com" }) };
+    }
+    if (url.endsWith("/announcements/7") && options.method === "PUT") {
+      savedRoute = JSON.parse(options.body);
+      return { ok: true, text: async () => JSON.stringify({ announcement: { ...savedRoute, id: 7 } }) };
+    }
+    return {
+      ok: true,
+      text: async () => JSON.stringify({ items: [announcement], totalItems: 1 }),
+    };
+  });
+
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "View Berlin to Prague" }));
+  const dialog = screen.getByRole("dialog");
+  fireEvent.click(within(dialog).getByRole("button", { name: "Edit route" }));
+
+  expect(within(dialog).getByText("I need a parcel delivered")).toBeInTheDocument();
+  expect(within(dialog).getByText("Parcel needs a courier")).toBeInTheDocument();
+  expect(within(dialog).getByRole("heading", { name: "Where does your parcel need to go?" })).toBeInTheDocument();
+  expect(within(dialog).queryByRole("button", { name: "I can deliver a parcel" })).not.toBeInTheDocument();
+  expect(screen.getByRole("combobox", { name: "Starting city" })).toHaveValue("Berlin");
+  expect(screen.getByRole("combobox", { name: "Destination city" })).toHaveValue("Prague");
+  expect(screen.getByLabelText("Leaving")).toHaveValue("2026-10-28T10:00");
+  expect(screen.getByLabelText("Arriving by")).toHaveValue("2026-10-28T15:00");
+  expect(screen.getByLabelText("Maximum weight (kg)")).toHaveValue(5);
+  expect(screen.getByLabelText("Width (cm)")).toHaveValue(5);
+  expect(screen.getByLabelText("Height (cm)")).toHaveValue(20);
+  expect(screen.getByLabelText("Length (cm)")).toHaveValue(30);
+  expect(screen.getByRole("combobox", { name: "Stop address" })).toHaveValue("Dresden");
+  expect(screen.getByRole("application", { name: "OpenStreetMap place picker" })).toBeInTheDocument();
+
+  fireEvent.change(screen.getByLabelText("Give your route a title"), { target: { value: "Updated Berlin trip" } });
+  fireEvent.click(screen.getByRole("button", { name: /Save route/ }));
+
+  await waitFor(() => expect(savedRoute).toEqual(expect.objectContaining({
+    type: "sender",
+    postingPlace: "Berlin",
+    postingLatitude: 52.52,
+    postingLongitude: 13.405,
+    receptionPlace: "Prague",
+    receptionLatitude: 50.0755,
+    receptionLongitude: 14.4378,
+    postingDateTime: "2026-10-28T10:00",
+    receptionDateTime: "2026-10-28T15:00",
+    weight: { value: 5, unit: "metric" },
+    dimensions: { width: 5, height: 20, length: 30, unit: "metric" },
+    stops: [{ id: 12, address: "Dresden", latitude: 51.0504, longitude: 13.7373, position: 0 }],
+    translations: [{ title: "Updated Berlin trip", description: "Room for a small parcel." }],
+  })));
+
+  L.Map.prototype.getSize.mockRestore();
+  L.Browser.svg = supportsSvg;
+});
+
 test("shows a non-interactive route map in details when coordinates are available", async () => {
   const supportsSvg = L.Browser.svg;
   L.Browser.svg = true;
