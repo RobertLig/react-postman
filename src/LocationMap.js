@@ -40,7 +40,7 @@ function markerStyle(active, key) {
   });
 }
 
-export default function LocationMap({ locations, activeKey, onMapPick, readOnly = false }) {
+export default function LocationMap({ locations, activeKey, onMapPick, readOnly = false, showRoute = true }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markerLayerRef = useRef(null);
@@ -117,7 +117,7 @@ export default function LocationMap({ locations, activeKey, onMapPick, readOnly 
       location.longitude,
     ]);
 
-    if (routeCoordinates.length > 1) {
+    if (showRoute && routeCoordinates.length > 1) {
       L.polyline(routeCoordinates, {
         color: "#fff",
         weight: 8,
@@ -161,7 +161,7 @@ export default function LocationMap({ locations, activeKey, onMapPick, readOnly 
     if (map.getSize().x <= 0 || map.getSize().y <= 0) return;
     lastViewRef.current = locationsView;
     fitLocationView(map, mappedLocations, readOnly);
-  }, [locations, activeKey, readOnly]);
+  }, [locations, activeKey, readOnly, showRoute]);
 
   return (
     <div className="location-map-wrap">

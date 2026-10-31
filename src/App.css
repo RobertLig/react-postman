@@ -67,6 +67,16 @@ h1, h2, h3, p { margin-top: 0; }
 .location-field input { width: 100%; min-width: 0; padding: 8px 0; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 11px; }
 .location-field input::placeholder { color: #a4afb6; }
 .search-button { min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 9px; padding: 0 20px; border: 0; border-radius: 9px; color: var(--color-primary-content); background: var(--color-primary); cursor: pointer; font-size: 12px; font-weight: 700; transition: .18s ease; }
+.advanced-search-filters { grid-column: 1 / -1; padding-top: 10px; border-top: 1px solid #edf1f2; }
+.advanced-search-filters summary { width: fit-content; color: #4a737b; cursor: pointer; font-size: 12px; font-weight: 700; }
+.filter-help { margin: 10px 0; color: #7b8b96; font-size: 11px; }
+.advanced-search-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px; padding: 8px 0 3px; }
+.advanced-search-grid > label { display: grid; align-content: start; gap: 6px; min-width: 0; color: #536672; font-size: 11px; font-weight: 700; }
+.advanced-search-grid input, .advanced-search-grid select { width: 100%; min-width: 0; min-height: 37px; padding: 8px 9px; border: 1px solid #e1e9eb; border-radius: 7px; color: var(--ink); background: #fff; font: inherit; font-size: 12px; }
+.advanced-search-grid input:focus, .advanced-search-grid select:focus { border-color: #70a5a8; outline: 2px solid rgba(74, 143, 151, .12); }
+.search-filter-map { grid-column: 1 / -1; margin-top: 6px; }
+.search-filter-map .location-map { height: 280px; }
+.search-filter-map .location-map-help { line-height: 1.5; }
 
 .listings-section { padding: 76px 0 64px; }
 .section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 27px; }
@@ -455,6 +465,12 @@ h1, h2, h3, p { margin-top: 0; }
   .location-field input { font-size: 9px; }
   .search-button { min-height: 41px; padding: 0 12px; font-size: 10px; }
   .search-button svg { width: 15px; }
+  .advanced-search-filters { padding-top: 8px; }
+  .advanced-search-filters summary { font-size: 10px; }
+  .filter-help { font-size: 9px; line-height: 1.5; }
+  .advanced-search-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .advanced-search-grid > label { font-size: 9px; }
+  .advanced-search-grid input, .advanced-search-grid select { min-height: 34px; padding: 7px; font-size: 10px; }
   .listings-section { padding: 52px 0 43px; }
   .section-heading { align-items: flex-start; }
   .section-heading h2 { max-width: 260px; font-size: 23px; }

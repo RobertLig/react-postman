@@ -40,6 +40,147 @@ test("renders and loads route listings", async () => {
   ));
 });
 
+test("sends the advanced announcement filters in the backend search format", async () => {
+  Object.defineProperty(window.navigator, "language", { configurable: true, value: "pl-PL" });
+  render(<App />);
+
+  expect(screen.queryByLabelText("Search language")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByText("More filters"));
+  fireEvent.change(screen.getByRole("textbox", { name: "I’m looking for" }), { target: { value: "parcel" } });
+  fireEvent.change(screen.getByLabelText("Posting latitude"), { target: { value: "52.52" } });
+  fireEvent.change(screen.getByLabelText("Posting longitude"), { target: { value: "13.405" } });
+  fireEvent.change(screen.getByLabelText("Search radius (km)"), { target: { value: "25" } });
+  fireEvent.change(screen.getByLabelText("Reception latitude"), { target: { value: "50.0755" } });
+  fireEvent.change(screen.getByLabelText("Reception longitude"), { target: { value: "14.4378" } });
+  fireEvent.change(screen.getByLabelText("Posting from"), { target: { value: "2026-10-28T10:00" } });
+  fireEvent.change(screen.getByLabelText("Minimum width (cm)"), { target: { value: "10" } });
+  fireEvent.change(screen.getByLabelText("Maximum weight filter (kg)"), { target: { value: "20" } });
+  fireEvent.change(screen.getByLabelText("Posted by user ID"), { target: { value: "3" } });
+  fireEvent.change(screen.getByLabelText("Sort by"), { target: { value: "postingDate" } });
+  fireEvent.change(screen.getByLabelText("Sort direction"), { target: { value: "desc" } });
+
+  await waitFor(() => {
+    const request = window.fetch.mock.calls.find(([url]) => String(url).includes("/announcements/search?"));
+    expect(request).toBeDefined();
+    const [url, options] = request;
+    expect(new URL(String(url)).searchParams.get("page")).toBe("0");
+    expect(JSON.parse(options.body)).toEqual(expect.objectContaining({
+      text: "parcel",
+      postingLatitude: 52.52,
+      postingLongitude: 13.405,
+      radiusKm: 25,
+      receptionLatitude: 50.0755,
+      receptionLongitude: 14.4378,
+      postingFrom: "2026-10-28T10:00",
+      minWidth: 10,
+      maxWeight: 20,
+      userId: 3,
+      sortBy: "postingDate",
+      sortDir: "desc",
+    }));
+    expect(JSON.parse(options.body)).not.toHaveProperty("language");
+    expect(options.headers["Accept-Language"]).toBe("pl-PL");
+    expect(options.method).toBe("POST");
+  });
+});
+
+test("uses the browser locale for text search when the locale is not supported", async () => {
+  Object.defineProperty(window.navigator, "language", { configurable: true, value: "fr-FR" });
+  render(<App />);
+
+  fireEvent.change(screen.getByLabelText("I’m looking for"), { target: { value: "parcel" } });
+
+  await waitFor(() => {
+    const request = window.fetch.mock.calls.find(([url]) => String(url).includes("/announcements/search?"));
+    expect(request).toBeDefined();
+    expect(request[1].headers["Accept-Language"]).toBe("fr-FR");
+    expect(JSON.parse(request[1].body)).toEqual(expect.objectContaining({ text: "parcel" }));
+    expect(JSON.parse(request[1].body)).not.toHaveProperty("language");
+  });
+});
+
+test("shows the location picker and tracks which search field is active", async () => {
+  window.fetch.mockImplementation(async (input) => {
+    if (String(input).includes("/reverse")) {
+      return {
+        ok: true,
+        json: async () => ({
+          features: [{
+            id: "test-town",
+            properties: { name: "Test Town", city: "Test Town", country: "Poland", osm_type: "R", osm_id: 1 },
+            geometry: { coordinates: [13.405, 52.52] },
+          }],
+        }),
+      };
+    }
+    return {
+      ok: true,
+      text: async () => JSON.stringify({
+        items: [{
+          id: 7,
+          type: "courier",
+          userId: 3,
+          postingPlace: "Berlin",
+          receptionPlace: "Prague",
+          postingDateTime: "2026-10-28T10:00:00",
+          receptionDateTime: "2026-10-28T15:00:00",
+          translations: [{ title: "Berlin to Prague", description: "Room for a small parcel." }],
+        }],
+        totalItems: 1,
+      }),
+    };
+  });
+  render(<App />);
+
+  fireEvent.click(screen.getByText("More filters"));
+
+  expect(await screen.findByRole("application", { name: "OpenStreetMap place picker" })).toBeInTheDocument();
+  expect(screen.getByText("Active field: From")).toBeInTheDocument();
+
+  fireEvent.focus(screen.getByPlaceholderText("Starting city"));
+  fireEvent.click(screen.getByRole("application", { name: "OpenStreetMap place picker" }), {
+    clientX: 120,
+    clientY: 80,
+  });
+  await waitFor(() => expect(screen.getByPlaceholderText("Starting city").value).toBe("Test Town, Poland"));
+
+  fireEvent.focus(screen.getByLabelText("Posting latitude"));
+  expect(screen.getByText("Active field: Posting latitude")).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Posting latitude"), { target: { value: "52.52" } });
+  fireEvent.change(screen.getByLabelText("Posting longitude"), { target: { value: "13.405" } });
+
+  expect(document.querySelectorAll(".search-filter-map .location-map-marker")).toHaveLength(2);
+  fireEvent.focus(screen.getByLabelText("Posting latitude"));
+  const postingLatitude = screen.getByLabelText("Posting latitude");
+  fireEvent.click(screen.getByRole("application", { name: "OpenStreetMap place picker" }), {
+    clientX: 160,
+    clientY: 100,
+  });
+  await waitFor(() => expect(postingLatitude.value).not.toBe("52.52"));
+  expect(screen.getByLabelText("Posting longitude")).toHaveValue(13.405);
+
+  fireEvent.focus(screen.getByLabelText("Reception longitude"));
+  expect(screen.getByText("Active field: Reception longitude")).toBeInTheDocument();
+});
+
+test("converts imperial parcel limits to the metric values stored by the backend", async () => {
+  Object.defineProperty(window.navigator, "language", { configurable: true, value: "en-US" });
+  render(<App />);
+
+  fireEvent.click(screen.getByText("More filters"));
+  fireEvent.change(screen.getByLabelText("I’m looking for"), { target: { value: "parcel" } });
+  fireEvent.change(screen.getByLabelText("Minimum width (in)"), { target: { value: "10" } });
+  fireEvent.change(screen.getByLabelText("Minimum weight filter (lb)"), { target: { value: "22" } });
+
+  await waitFor(() => {
+    const request = window.fetch.mock.calls.find(([url]) => String(url).includes("/announcements/search?"));
+    expect(request).toBeDefined();
+    const filters = JSON.parse(request[1].body);
+    expect(filters.minWidth).toBe(25.4);
+    expect(filters.minWeight).toBe(9.98);
+  });
+});
+
 test("opens route details from a listing", async () => {
   render(<App />);
 
@@ -165,7 +306,7 @@ test("prefills and saves every route field from the details edit form", async ()
   expect(screen.getByLabelText("Height (cm)")).toHaveValue(20);
   expect(screen.getByLabelText("Length (cm)")).toHaveValue(30);
   expect(screen.getByRole("combobox", { name: "Stop address" })).toHaveValue("Dresden");
-  expect(screen.getByRole("application", { name: "OpenStreetMap place picker" })).toBeInTheDocument();
+  expect(within(dialog).getByRole("application", { name: "OpenStreetMap place picker" })).toBeInTheDocument();
 
   fireEvent.change(screen.getByLabelText("Give your route a title"), { target: { value: "Updated Berlin trip" } });
   fireEvent.click(screen.getByRole("button", { name: /Save route/ }));
@@ -408,6 +549,90 @@ test("hides the add-photo control when the gallery reaches its three-photo limit
     const dialog = screen.getByRole("dialog", { name: "Berlin to Prague" });
     expect(dialog.querySelectorAll(".photo-gallery img")).toHaveLength(3);
     expect(within(dialog).queryByText("Add parcel photos")).not.toBeInTheDocument();
+});
+
+test("hides the add-photo control for courier ads in the details dialog", async () => {
+  window.sessionStorage.setItem("wayline.accessToken", "test-token");
+  window.fetch.mockImplementation(async (input) => ({
+    ok: true,
+    text: async () => JSON.stringify(String(input).includes("/users/me")
+      ? { id: 3, name: "Taylor Traveler", email: "taylor@example.com" }
+      : {
+        items: [{
+          id: 7,
+          type: "courier",
+          userId: 3,
+          postingPlace: "Berlin",
+          receptionPlace: "Prague",
+          translations: [{ title: "Berlin to Prague", description: "Room for a small parcel." }],
+        }],
+        totalItems: 1,
+      }),
+  }));
+
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "View Berlin to Prague" }));
+
+  const dialog = screen.getByRole("dialog", { name: "Berlin to Prague" });
+  expect(within(dialog).queryByText("Add parcel photos")).not.toBeInTheDocument();
+});
+
+test("loads sender photos for details and edit when listings omit the photo collection", async () => {
+  window.sessionStorage.setItem("wayline.accessToken", "test-token");
+  window.fetch.mockImplementation(async (input) => {
+    const url = new URL(String(input));
+    if (url.pathname === "/users/me") {
+      return {
+        ok: true,
+        text: async () => JSON.stringify({ id: 3, name: "Taylor Traveler", email: "taylor@example.com" }),
+      };
+    }
+    if (url.pathname === "/announcements/7") {
+      return {
+        ok: true,
+        text: async () => JSON.stringify({
+          id: 7,
+          type: "sender",
+          userId: 3,
+          postingPlace: "Berlin",
+          receptionPlace: "Prague",
+          translations: [{ title: "Berlin to Prague", description: "Room for a small parcel." }],
+          photos: [
+            { id: 11, url: "https://images.example/first.jpg", position: 0 },
+            { id: 12, url: "https://images.example/second.jpg", position: 1 },
+          ],
+        }),
+      };
+    }
+    return {
+      ok: true,
+      text: async () => JSON.stringify({
+        items: [{
+          id: 7,
+          type: "sender",
+          userId: 3,
+          postingPlace: "Berlin",
+          receptionPlace: "Prague",
+          translations: [{ title: "Berlin to Prague", description: "Room for a small parcel." }],
+        }],
+        totalItems: 1,
+      }),
+    };
+  });
+
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "View Berlin to Prague" }));
+
+  const dialog = screen.getByRole("dialog", { name: "Berlin to Prague" });
+  expect(await within(dialog).findByRole("img", { name: "Route 1" })).toHaveAttribute(
+    "src",
+    "https://images.example/first.jpg",
+  );
+  fireEvent.click(within(dialog).getByRole("button", { name: /Edit route/ }));
+  expect(within(dialog).getByRole("img", { name: "Route 2" })).toHaveAttribute(
+    "src",
+    "https://images.example/second.jpg",
+  );
 });
 
 test("opens the account dialog from the header", async () => {

@@ -82,6 +82,17 @@ function getErrorMessage(error) {
   return error?.message || "Something went wrong. Please try again.";
 }
 
+function parseSearchNumber(value, factor = 1) {
+  if (value === "") return undefined;
+  const number = Number(value);
+  return Number.isFinite(number) ? number * factor : undefined;
+}
+
+function parseSearchMeasurement(value, factor = 1) {
+  const measurement = parseSearchNumber(value, factor);
+  return measurement === undefined ? undefined : Math.round((measurement + Number.EPSILON) * 100) / 100;
+}
+
 function formatDate(value, options = { month: "short", day: "numeric" }) {
   if (!value) return "Date flexible";
   const date = new Date(value);
@@ -190,6 +201,34 @@ function App() {
   const [originSearch, setOriginSearch] = useState("");
   const [destinationSearch, setDestinationSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [activeSearchMapKey, setActiveSearchMapKey] = useState("origin");
+  const [searchMapPlaces, setSearchMapPlaces] = useState({ origin: null, destination: null });
+  const [searchMapCoordinatePin, setSearchMapCoordinatePin] = useState(null);
+  const [searchMapError, setSearchMapError] = useState("");
+  const [searchFiltersOpen, setSearchFiltersOpen] = useState(false);
+  const searchMapReverseGeocodeController = useRef(null);
+  const [advancedFilters, setAdvancedFilters] = useState(() => ({
+    postingLatitude: "",
+    postingLongitude: "",
+    receptionLatitude: "",
+    receptionLongitude: "",
+    radiusKm: "",
+    postingFrom: "",
+    postingTo: "",
+    receptionFrom: "",
+    receptionTo: "",
+    minWidth: "",
+    maxWidth: "",
+    minHeight: "",
+    maxHeight: "",
+    minLength: "",
+    maxLength: "",
+    minWeight: "",
+    maxWeight: "",
+    userId: "",
+    sortBy: "",
+    sortDir: "asc",
+  }));
   const [page, setPage] = useState("explore");
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
   const [authOpen, setAuthOpen] = useState(false);
@@ -210,6 +249,107 @@ function App() {
   const [sendingSupport, setSendingSupport] = useState(false);
   const [supportComposerOpen, setSupportComposerOpen] = useState(false);
   const [recentlyHiddenConversation, setRecentlyHiddenConversation] = useState(null);
+
+  useEffect(() => () => searchMapReverseGeocodeController.current?.abort(), []);
+
+  const searchMapLocations = [
+    { key: "origin", label: `From: ${originSearch || "Starting place"}`, location: searchMapPlaces.origin },
+    {
+      key: "postingCoordinates",
+      label: "Posting coordinates",
+      location: coordinateLocation(
+        "Posting coordinates",
+        advancedFilters.postingLatitude,
+        advancedFilters.postingLongitude,
+      ),
+    },
+    { key: "destination", label: `To: ${destinationSearch || "Destination"}`, location: searchMapPlaces.destination },
+    {
+      key: "receptionCoordinates",
+      label: "Reception coordinates",
+      location: coordinateLocation(
+        "Reception coordinates",
+        advancedFilters.receptionLatitude,
+        advancedFilters.receptionLongitude,
+      ),
+    },
+    ...(searchMapCoordinatePin
+      && !hasCoordinates(
+        searchMapCoordinatePin.key === "postingCoordinates"
+          ? advancedFilters.postingLatitude
+          : advancedFilters.receptionLatitude,
+        searchMapCoordinatePin.key === "postingCoordinates"
+          ? advancedFilters.postingLongitude
+          : advancedFilters.receptionLongitude,
+      )
+      ? [{ ...searchMapCoordinatePin, label: "Selected map location" }]
+      : []),
+  ];
+  const activeSearchMapLabel = {
+    origin: "From",
+    destination: "To",
+    postingLatitude: "Posting latitude",
+    postingLongitude: "Posting longitude",
+    receptionLatitude: "Reception latitude",
+    receptionLongitude: "Reception longitude",
+  }[activeSearchMapKey];
+  const activeSearchMapMarkerKey = activeSearchMapKey === "postingLatitude" || activeSearchMapKey === "postingLongitude"
+    ? "postingCoordinates"
+    : activeSearchMapKey === "receptionLatitude" || activeSearchMapKey === "receptionLongitude"
+      ? "receptionCoordinates"
+      : activeSearchMapKey;
+
+  const handleSearchMapPick = async ({ latitude, longitude }) => {
+    searchMapReverseGeocodeController.current?.abort();
+    setSearchMapError("");
+
+    if (activeSearchMapKey === "postingLatitude" || activeSearchMapKey === "postingLongitude"
+      || activeSearchMapKey === "receptionLatitude" || activeSearchMapKey === "receptionLongitude") {
+      const field = activeSearchMapKey;
+      const value = field.endsWith("Latitude") ? latitude : longitude;
+      const markerKey = field.startsWith("posting") ? "postingCoordinates" : "receptionCoordinates";
+      setSearchMapCoordinatePin({
+        key: markerKey,
+        location: {
+          id: `pin/${latitude},${longitude}`,
+          label: `Pinned location (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`,
+          latitude,
+          longitude,
+        },
+      });
+      setAdvancedFilters((current) => ({ ...current, [field]: value.toFixed(5) }));
+      return;
+    }
+
+    const key = activeSearchMapKey;
+    setSearchMapCoordinatePin(null);
+    const fallbackLocation = {
+      id: `pin/${latitude},${longitude}`,
+      label: `Pinned location (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`,
+      latitude,
+      longitude,
+    };
+    const updatePlace = (location) => {
+      setSearchMapPlaces((current) => ({ ...current, [key]: location }));
+      if (key === "origin") setOriginSearch(location.label);
+      else setDestinationSearch(location.label);
+    };
+
+    updatePlace(fallbackLocation);
+    const controller = new AbortController();
+    searchMapReverseGeocodeController.current = controller;
+    try {
+      const location = await reverseGeocodeLocation(latitude, longitude, { signal: controller.signal });
+      if (!controller.signal.aborted) {
+        updatePlace(location ? { ...location, latitude, longitude } : fallbackLocation);
+      }
+    } catch (failure) {
+      if (failure.name !== "AbortError" && !controller.signal.aborted) {
+        updatePlace(fallbackLocation);
+        setSearchMapError(`${failure.message || "Could not look up this place."} The map pin coordinates are still selected.`);
+      }
+    }
+  };
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -261,8 +401,30 @@ function App() {
         postingPlace: originSearch.trim() || undefined,
         receptionPlace: destinationSearch.trim() || undefined,
         type: typeFilter === "all" ? undefined : typeFilter,
+        postingLatitude: parseSearchNumber(advancedFilters.postingLatitude),
+        postingLongitude: parseSearchNumber(advancedFilters.postingLongitude),
+        receptionLatitude: parseSearchNumber(advancedFilters.receptionLatitude),
+        receptionLongitude: parseSearchNumber(advancedFilters.receptionLongitude),
+        radiusKm: parseSearchNumber(advancedFilters.radiusKm),
+        postingFrom: advancedFilters.postingFrom || undefined,
+        postingTo: advancedFilters.postingTo || undefined,
+        receptionFrom: advancedFilters.receptionFrom || undefined,
+        receptionTo: advancedFilters.receptionTo || undefined,
+        minWidth: parseSearchMeasurement(advancedFilters.minWidth, getMeasurementSystem() === "imperial" ? 2.54 : 1),
+        maxWidth: parseSearchMeasurement(advancedFilters.maxWidth, getMeasurementSystem() === "imperial" ? 2.54 : 1),
+        minHeight: parseSearchMeasurement(advancedFilters.minHeight, getMeasurementSystem() === "imperial" ? 2.54 : 1),
+        maxHeight: parseSearchMeasurement(advancedFilters.maxHeight, getMeasurementSystem() === "imperial" ? 2.54 : 1),
+        minLength: parseSearchMeasurement(advancedFilters.minLength, getMeasurementSystem() === "imperial" ? 2.54 : 1),
+        maxLength: parseSearchMeasurement(advancedFilters.maxLength, getMeasurementSystem() === "imperial" ? 2.54 : 1),
+        minWeight: parseSearchMeasurement(advancedFilters.minWeight, getMeasurementSystem() === "imperial" ? 0.45359237 : 1),
+        maxWeight: parseSearchMeasurement(advancedFilters.maxWeight, getMeasurementSystem() === "imperial" ? 0.45359237 : 1),
+        userId: Number.isSafeInteger(Number(advancedFilters.userId)) && Number(advancedFilters.userId) > 0
+          ? Number(advancedFilters.userId)
+          : undefined,
+        sortBy: advancedFilters.sortBy || undefined,
+        sortDir: advancedFilters.sortBy ? advancedFilters.sortDir : undefined,
       };
-      const hasFilter = Object.values(filters).some(Boolean);
+      const hasFilter = Object.values(filters).some((value) => value !== undefined && value !== null && value !== "");
       const query = new URLSearchParams({ page: String(listingPage), size: "12" });
       const response = await apiRequest(
         hasFilter
@@ -278,7 +440,7 @@ function App() {
     } finally {
       setLoadingAnnouncements(false);
     }
-  }, [search, originSearch, destinationSearch, typeFilter, listingPage]);
+  }, [search, originSearch, destinationSearch, typeFilter, advancedFilters, listingPage]);
 
   useEffect(() => {
     const timer = window.setTimeout(loadAnnouncements, 250);
@@ -287,7 +449,7 @@ function App() {
 
   useEffect(() => {
     setListingPage(0);
-  }, [search, originSearch, destinationSearch, typeFilter]);
+  }, [search, originSearch, destinationSearch, typeFilter, advancedFilters]);
 
   useEffect(() => {
     if (!token) {
@@ -567,12 +729,32 @@ function App() {
             <label className="filter-field location-field">
               <Icon name="pin" size={18} />
               <span className="field-name">From</span>
-              <input value={originSearch} onChange={(event) => setOriginSearch(event.target.value)} placeholder="Starting city" />
+              <input
+                value={originSearch}
+                onFocus={() => setActiveSearchMapKey("origin")}
+                onChange={(event) => {
+                  searchMapReverseGeocodeController.current?.abort();
+                  setSearchMapPlaces((current) => ({ ...current, origin: null }));
+                  setSearchMapError("");
+                  setOriginSearch(event.target.value);
+                }}
+                placeholder="Starting city"
+              />
             </label>
             <label className="filter-field location-field">
               <Icon name="pin" size={18} />
               <span className="field-name">To</span>
-              <input value={destinationSearch} onChange={(event) => setDestinationSearch(event.target.value)} placeholder="Destination" />
+              <input
+                value={destinationSearch}
+                onFocus={() => setActiveSearchMapKey("destination")}
+                onChange={(event) => {
+                  searchMapReverseGeocodeController.current?.abort();
+                  setSearchMapPlaces((current) => ({ ...current, destination: null }));
+                  setSearchMapError("");
+                  setDestinationSearch(event.target.value);
+                }}
+                placeholder="Destination"
+              />
             </label>
             <div className="filter-field">
               <Icon name="route" size={19} />
@@ -584,6 +766,97 @@ function App() {
               </select>
             </div>
             <button className="search-button" onClick={loadAnnouncements}><Icon name="search" size={18} /><span>Find a delivery</span></button>
+            <details
+              className="advanced-search-filters"
+              onToggle={(event) => setSearchFiltersOpen(event.currentTarget.open)}
+            >
+              <summary>More filters</summary>
+              <p className="filter-help">Route titles and descriptions are displayed in your browser language. Text search uses Polish for Polish browsers and English otherwise.</p>
+              <div className="advanced-search-grid">
+                <label>Posting latitude
+                  <input type="number" step="any" value={advancedFilters.postingLatitude} onFocus={() => setActiveSearchMapKey("postingLatitude")} onChange={(event) => { setSearchMapCoordinatePin(null); setAdvancedFilters((current) => ({ ...current, postingLatitude: event.target.value })); }} />
+                </label>
+                <label>Posting longitude
+                  <input type="number" step="any" value={advancedFilters.postingLongitude} onFocus={() => setActiveSearchMapKey("postingLongitude")} onChange={(event) => { setSearchMapCoordinatePin(null); setAdvancedFilters((current) => ({ ...current, postingLongitude: event.target.value })); }} />
+                </label>
+                <label>Search radius (km)
+                  <input type="number" min="0" step="any" value={advancedFilters.radiusKm} onChange={(event) => setAdvancedFilters((current) => ({ ...current, radiusKm: event.target.value }))} />
+                </label>
+                <label>Reception latitude
+                  <input type="number" step="any" value={advancedFilters.receptionLatitude} onFocus={() => setActiveSearchMapKey("receptionLatitude")} onChange={(event) => { setSearchMapCoordinatePin(null); setAdvancedFilters((current) => ({ ...current, receptionLatitude: event.target.value })); }} />
+                </label>
+                <label>Reception longitude
+                  <input type="number" step="any" value={advancedFilters.receptionLongitude} onFocus={() => setActiveSearchMapKey("receptionLongitude")} onChange={(event) => { setSearchMapCoordinatePin(null); setAdvancedFilters((current) => ({ ...current, receptionLongitude: event.target.value })); }} />
+                </label>
+                <label>Posting from
+                  <input type="datetime-local" value={advancedFilters.postingFrom} onChange={(event) => setAdvancedFilters((current) => ({ ...current, postingFrom: event.target.value }))} />
+                </label>
+                <label>Posting to
+                  <input type="datetime-local" value={advancedFilters.postingTo} onChange={(event) => setAdvancedFilters((current) => ({ ...current, postingTo: event.target.value }))} />
+                </label>
+                <label>Reception from
+                  <input type="datetime-local" value={advancedFilters.receptionFrom} onChange={(event) => setAdvancedFilters((current) => ({ ...current, receptionFrom: event.target.value }))} />
+                </label>
+                <label>Reception to
+                  <input type="datetime-local" value={advancedFilters.receptionTo} onChange={(event) => setAdvancedFilters((current) => ({ ...current, receptionTo: event.target.value }))} />
+                </label>
+                {[
+                  ["minWidth", `Minimum width (${getMeasurementSystem() === "imperial" ? "in" : "cm"})`],
+                  ["maxWidth", `Maximum width (${getMeasurementSystem() === "imperial" ? "in" : "cm"})`],
+                  ["minHeight", `Minimum height (${getMeasurementSystem() === "imperial" ? "in" : "cm"})`],
+                  ["maxHeight", `Maximum height (${getMeasurementSystem() === "imperial" ? "in" : "cm"})`],
+                  ["minLength", `Minimum length (${getMeasurementSystem() === "imperial" ? "in" : "cm"})`],
+                  ["maxLength", `Maximum length (${getMeasurementSystem() === "imperial" ? "in" : "cm"})`],
+                  ["minWeight", `Minimum weight filter (${getMeasurementSystem() === "imperial" ? "lb" : "kg"})`],
+                  ["maxWeight", `Maximum weight filter (${getMeasurementSystem() === "imperial" ? "lb" : "kg"})`],
+                ].map(([key, label]) => (
+                  <label key={key}>{label}
+                    <input type="number" min="0" step="any" value={advancedFilters[key]} onChange={(event) => setAdvancedFilters((current) => ({ ...current, [key]: event.target.value }))} />
+                  </label>
+                ))}
+                <label>Posted by user ID
+                  <input type="number" min="1" step="1" value={advancedFilters.userId} onChange={(event) => setAdvancedFilters((current) => ({ ...current, userId: event.target.value }))} />
+                </label>
+                <label>Sort by
+                  <select value={advancedFilters.sortBy} onChange={(event) => setAdvancedFilters((current) => ({ ...current, sortBy: event.target.value }))}>
+                    <option value="">Default order</option>
+                    <option value="postingDate">Posting date</option>
+                    <option value="receptionDate">Reception date</option>
+                    <option value="weight">Weight</option>
+                    <option value="width">Width</option>
+                    <option value="height">Height</option>
+                    <option value="length">Length</option>
+                    <option value="postingPlace">Starting place</option>
+                    <option value="receptionPlace">Destination</option>
+                    <option value="type">Ad type</option>
+                    <option value="user">User</option>
+                  </select>
+                </label>
+                <label>Sort direction
+                  <select value={advancedFilters.sortDir} onChange={(event) => setAdvancedFilters((current) => ({ ...current, sortDir: event.target.value }))}>
+                    <option value="asc">Ascending</option>
+                    <option value="desc">Descending</option>
+                  </select>
+                </label>
+              </div>
+              <div className="search-filter-map">
+                <div className="location-map-heading">
+                  <b>Pick a location on the map</b>
+                  <span>Active field: {activeSearchMapLabel}</span>
+                </div>
+                {searchFiltersOpen && (
+                  <>
+                    <LocationMap
+                      locations={searchMapLocations}
+                      activeKey={activeSearchMapMarkerKey}
+                      onMapPick={handleSearchMapPick}
+                      showRoute={false}
+                    />
+                    {searchMapError && <p className="form-error location-map-error" role="alert">{searchMapError}</p>}
+                  </>
+                )}
+              </div>
+            </details>
           </section>
 
           <section className="listings-section">
@@ -978,7 +1251,27 @@ function AnnouncementDialog({ announcement, token, onClose, onContact, onChange,
   const nextStopId = useRef(1);
   const measurementSystem = getMeasurementSystem();
   const needsCourier = announcement.type === "sender";
-  useEffect(() => setPhotos(sortPhotosByPosition(announcement.photos)), [announcement]);
+  useEffect(() => {
+    let active = true;
+    setPhotoError("");
+    if (Array.isArray(announcement.photos) || !needsCourier) {
+      setPhotos(sortPhotosByPosition(announcement.photos));
+      return () => { active = false; };
+    }
+
+    apiRequest(`/announcements/${announcement.id}`, { token })
+      .then((details) => {
+        if (!Array.isArray(details?.photos)) {
+          throw new Error("Could not load route photos.");
+        }
+        if (active) setPhotos(sortPhotosByPosition(details.photos));
+      })
+      .catch((error) => {
+        if (active) setPhotoError(getErrorMessage(error));
+      });
+
+    return () => { active = false; };
+  }, [announcement.id, announcement.photos, needsCourier, token]);
   useEffect(() => () => reverseGeocodeController.current?.abort(), []);
 
   const updateEditForm = (key, value) => setEditForm((current) => ({ ...current, [key]: value }));
@@ -1229,7 +1522,7 @@ function AnnouncementDialog({ announcement, token, onClose, onContact, onChange,
             <div className="route-edit-actions"><button className="outline-button" type="button" onClick={() => { setEditing(false); setPhotoError(""); setMapError(""); }}>Cancel</button><button className="dialog-primary" disabled={photoBusy}>{photoBusy ? "Saving..." : "Save route"}<Icon name="check" size={15} /></button></div>
           </form> : <h2 id="detail-title">{announcementTitle(announcement)}</h2>}
           {photos.length > 0 && <div className="photo-gallery">{photos.map((photo, index) => <div className="detail-photo" key={photo.id}><img src={photo.url} alt={`Route ${index + 1}`} />{String(user?.id) === String(announcement.userId) && <div className="photo-actions">{photo.position === 0 ? <span>Cover photo</span> : <button disabled={photoBusy} onClick={() => setMainPhoto(photo)}>Make cover</button>}<button disabled={photoBusy || index === 0} title="Move photo earlier" onClick={() => movePhoto(index, -1)} aria-label="Move photo earlier">↑</button><button disabled={photoBusy || index === photos.length - 1} title="Move photo later" onClick={() => movePhoto(index, 1)} aria-label="Move photo later">↓</button><button disabled={photoBusy} onClick={() => removePhoto(photo)} aria-label="Remove photo"><Icon name="close" size={14} /></button></div>}</div>)}</div>}
-          {String(user?.id) === String(announcement.userId) && photos.length < 3 && <label className="add-photo-control"><Icon name="plus" size={15} />{photoBusy ? "Uploading..." : "Add parcel photos"}<input type="file" accept="image/jpeg,image/png" disabled={photoBusy} onChange={(event) => { addPhoto(event.target.files?.[0]); event.target.value = ""; }} /></label>}
+          {needsCourier && String(user?.id) === String(announcement.userId) && photos.length < 3 && <label className="add-photo-control"><Icon name="plus" size={15} />{photoBusy ? "Uploading..." : "Add parcel photos"}<input type="file" accept="image/jpeg,image/png" disabled={photoBusy} onChange={(event) => { addPhoto(event.target.files?.[0]); event.target.value = ""; }} /></label>}
           {photoError && <div className="form-error" role="alert">{photoError}</div>}
           {!editing && <div className="detail-route"><span className="route-point start" /><div><b title={announcement.postingPlace}>{announcement.postingPlace}</b><small>Starting point</small></div><span className="detail-route-line" /><span className="route-point end" /><div><b title={announcement.receptionPlace}>{announcement.receptionPlace}</b><small>Destination</small></div></div>}
           {!editing && hasCoordinates(announcement.postingLatitude, announcement.postingLongitude)
