@@ -246,6 +246,7 @@ function App() {
   const [messagesHasMore, setMessagesHasMore] = useState(false);
   const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
   const [messagesError, setMessagesError] = useState("");
+  const activeConversationId = activeConversation?.id;
   const [supportDraft, setSupportDraft] = useState("");
   const [supportError, setSupportError] = useState("");
   const [sendingSupport, setSendingSupport] = useState(false);
@@ -538,8 +539,8 @@ function App() {
   }, [activeConversation, loadMessages, loadingOlderMessages, messages]);
 
   const refreshActiveMessages = useCallback(
-    () => loadMessages(activeConversation),
-    [activeConversation, loadMessages],
+    () => loadMessages(activeConversationId ? { id: activeConversationId } : null),
+    [activeConversationId, loadMessages],
   );
   const setSearchMessages = useCallback((items) => {
     setMessages([...items].sort((left, right) => new Date(left.createdAt) - new Date(right.createdAt)));
@@ -552,10 +553,27 @@ function App() {
     setConversations(updateUnread);
     setSupportConversations(updateUnread);
   }, []);
+  const updatePresence = useCallback((userId, online) => {
+    const updateConversationPresence = (current) => current.map((item) => {
+      const other = item.participants?.find((person) => String(person.id) !== String(user?.id));
+      return String(other?.id) === String(userId) && item.otherUserOnline !== online
+        ? { ...item, otherUserOnline: online }
+        : item;
+    });
+    setConversations(updateConversationPresence);
+    setSupportConversations(updateConversationPresence);
+    setActiveConversation((current) => {
+      if (!current) return current;
+      const other = current.participants?.find((person) => String(person.id) !== String(user?.id));
+      return String(other?.id) === String(userId) && current.otherUserOnline !== online
+        ? { ...current, otherUserOnline: online }
+        : current;
+    });
+  }, [user?.id]);
 
   useEffect(() => {
-    loadMessages(activeConversation);
-  }, [activeConversation, loadMessages]);
+    loadMessages(activeConversationId ? { id: activeConversationId } : null);
+  }, [activeConversationId, loadMessages]);
 
   const handleAuth = (authResponse) => {
     saveSession(authResponse.token, authResponse.user);
@@ -664,6 +682,7 @@ function App() {
         },
       });
       setActiveConversation(conversation);
+      setSelectedAnnouncement(null);
       setPage("messages");
       await loadConversations();
     } catch (error) {
@@ -1006,6 +1025,7 @@ function App() {
                   await loadConversations();
                 }}
                 onUnreadCount={updateUnreadCount}
+                onPresence={updatePresence}
                 onDeleteMessage={async (messageId) => {
                   await apiRequest(`/messages/${messageId}`, { method: "DELETE", token });
                   await loadMessages(activeConversation);
@@ -2030,6 +2050,7 @@ function ConversationPanel({
   onRefreshMessages,
   onSearchReset,
   onUnreadCount,
+  onPresence,
   hasMore,
   loadingOlder,
   onLoadOlder,
@@ -2057,41 +2078,47 @@ function ConversationPanel({
   useEffect(() => {
     if (!token || !conversation?.id) return undefined;
     let active = true;
+    let connectTimer;
     let refreshTimer;
     let socket;
-    try {
-      socket = new WebSocket(getWebSocketUrl(`/ws/chat/${conversation.id}?token=${encodeURIComponent(token)}`));
-      socketRef.current = socket;
-      socket.onopen = () => active && setConnection("connected");
-      socket.onerror = () => active && setConnection("unavailable");
-      socket.onclose = () => active && setConnection("disconnected");
-      socket.onmessage = (event) => {
-        let payload;
-        try {
-          payload = JSON.parse(event.data);
-        } catch {
-          return;
-        }
-        if (payload.conversationId && String(payload.conversationId) !== String(conversation.id)) return;
-        if (payload.event === "TYPING_START" && String(payload.userId) !== String(user?.id)) setTyping(true);
-        if (payload.event === "TYPING_STOP" && String(payload.userId) !== String(user?.id)) setTyping(false);
-        if (payload.event === "UNREAD_COUNT_UPDATE") onUnreadCount(conversation.id, payload.unreadCount);
-        if (payload.event === "READ" && String(payload.userId) === String(user?.id)) onUnreadCount(conversation.id, 0);
-        if (["MESSAGE", "REACTION", "ATTACHMENT", "DELETED", "READ", "DELIVERED"].includes(payload.event)) {
-          window.clearTimeout(refreshTimer);
-          refreshTimer = window.setTimeout(onRefreshMessages, 100);
-        }
-      };
-    } catch {
-      setConnection("unavailable");
-    }
+    connectTimer = window.setTimeout(() => {
+      if (!active) return;
+      try {
+        socket = new WebSocket(getWebSocketUrl(`/ws/chat/${conversation.id}?token=${encodeURIComponent(token)}`));
+        socketRef.current = socket;
+        socket.onopen = () => active && setConnection("connected");
+        socket.onerror = () => active && setConnection("unavailable");
+        socket.onclose = () => active && setConnection("disconnected");
+        socket.onmessage = (event) => {
+          let payload;
+          try {
+            payload = JSON.parse(event.data);
+          } catch {
+            return;
+          }
+          if (payload.conversationId && String(payload.conversationId) !== String(conversation.id)) return;
+          if (payload.event === "PRESENCE") onPresence(payload.userId, payload.online);
+          if (payload.event === "TYPING_START" && String(payload.userId) !== String(user?.id)) setTyping(true);
+          if (payload.event === "TYPING_STOP" && String(payload.userId) !== String(user?.id)) setTyping(false);
+          if (payload.event === "UNREAD_COUNT_UPDATE") onUnreadCount(conversation.id, payload.unreadCount);
+          if (payload.event === "READ" && String(payload.userId) === String(user?.id)) onUnreadCount(conversation.id, 0);
+          if (["MESSAGE", "REACTION", "ATTACHMENT", "DELETED", "READ", "DELIVERED"].includes(payload.event)) {
+            window.clearTimeout(refreshTimer);
+            refreshTimer = window.setTimeout(onRefreshMessages, 100);
+          }
+        };
+      } catch {
+        setConnection("unavailable");
+      }
+    }, 0);
     return () => {
       active = false;
+      window.clearTimeout(connectTimer);
       window.clearTimeout(refreshTimer);
       if (socketRef.current === socket) socketRef.current = null;
       if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) socket.close();
     };
-  }, [conversation, onRefreshMessages, onUnreadCount, token, user?.id]);
+  }, [conversation?.id, onPresence, onRefreshMessages, onUnreadCount, token, user?.id]);
 
   useEffect(() => {
     const latestIncoming = [...messages]
