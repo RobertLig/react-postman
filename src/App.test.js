@@ -55,7 +55,8 @@ test("sends the advanced announcement filters in the backend search format", asy
   fireEvent.change(screen.getByLabelText("Posting from"), { target: { value: "2026-10-28T10:00" } });
   fireEvent.change(screen.getByLabelText("Minimum width (cm)"), { target: { value: "10" } });
   fireEvent.change(screen.getByLabelText("Maximum weight filter (kg)"), { target: { value: "20" } });
-  fireEvent.change(screen.getByLabelText("Posted by user ID"), { target: { value: "3" } });
+  fireEvent.change(screen.getByLabelText("Ad owner's age range"), { target: { value: "RANGE_30_39" } });
+  fireEvent.change(screen.getByLabelText("Ad owner's gender"), { target: { value: "FEMALE" } });
   fireEvent.change(screen.getByLabelText("Sort by"), { target: { value: "postingDate" } });
   fireEvent.change(screen.getByLabelText("Sort direction"), { target: { value: "desc" } });
 
@@ -74,14 +75,64 @@ test("sends the advanced announcement filters in the backend search format", asy
       postingFrom: "2026-10-28T10:00",
       minWidth: 10,
       maxWeight: 20,
-      userId: 3,
+      ownerAgeRange: "RANGE_30_39",
+      ownerGender: "FEMALE",
       sortBy: "postingDate",
       sortDir: "desc",
     }));
+    expect(JSON.parse(options.body)).not.toHaveProperty("userId");
     expect(JSON.parse(options.body)).not.toHaveProperty("language");
     expect(options.headers["Accept-Language"]).toBe("pl-PL");
     expect(options.method).toBe("POST");
   });
+});
+
+test("filters to the signed-in user's ads and exposes owner actions", async () => {
+  window.sessionStorage.setItem("wayline.accessToken", "test-token");
+  const announcement = {
+    id: 15,
+    type: "courier",
+    userId: 3,
+    postingPlace: "Berlin",
+    receptionPlace: "Prague",
+    translations: [{ title: "My Berlin route", description: "My delivery ad." }],
+  };
+  window.fetch.mockImplementation(async (input, options = {}) => {
+    const url = String(input);
+    if (url.includes("/users/me")) {
+      return { ok: true, text: async () => JSON.stringify({ id: 3, name: "Taylor Traveler" }) };
+    }
+    if (url.includes("/announcements/search?")) {
+      return {
+        ok: true,
+        text: async () => JSON.stringify({ items: [announcement], totalItems: 1, totalPages: 1 }),
+      };
+    }
+    return {
+      ok: true,
+      text: async () => JSON.stringify({ items: [announcement], totalItems: 1, totalPages: 1 }),
+    };
+  });
+
+  render(<App />);
+  fireEvent.click(screen.getByText("More filters"));
+  const myAdsFilter = await screen.findByLabelText("Show only my ads");
+  await waitFor(() => expect(myAdsFilter).toBeEnabled());
+  fireEvent.click(myAdsFilter);
+
+  await waitFor(() => {
+    const request = window.fetch.mock.calls.find(
+      ([url, options]) => String(url).includes("/announcements/search?")
+        && options.method === "POST",
+    );
+    expect(request).toBeDefined();
+    expect(JSON.parse(request[1].body).userId).toBe(3);
+  });
+
+  fireEvent.click(await screen.findByRole("button", { name: "View My Berlin route" }));
+  const dialog = screen.getByRole("dialog", { name: "My Berlin route" });
+  expect(within(dialog).getByRole("button", { name: "Edit route" })).toBeInTheDocument();
+  expect(within(dialog).getByRole("button", { name: "Remove this route" })).toBeInTheDocument();
 });
 
 test("uses the browser locale for text search when the locale is not supported", async () => {
@@ -169,6 +220,7 @@ test("converts imperial parcel limits to the metric values stored by the backend
 
   fireEvent.click(screen.getByText("More filters"));
   fireEvent.change(screen.getByLabelText("I’m looking for"), { target: { value: "parcel" } });
+  fireEvent.change(screen.getByLabelText("Search radius (mi)"), { target: { value: "10" } });
   fireEvent.change(screen.getByLabelText("Minimum width (in)"), { target: { value: "10" } });
   fireEvent.change(screen.getByLabelText("Minimum weight filter (lb)"), { target: { value: "22" } });
 
@@ -176,6 +228,7 @@ test("converts imperial parcel limits to the metric values stored by the backend
     const request = window.fetch.mock.calls.find(([url]) => String(url).includes("/announcements/search?"));
     expect(request).toBeDefined();
     const filters = JSON.parse(request[1].body);
+    expect(filters.radiusKm).toBe(16.09344);
     expect(filters.minWidth).toBe(25.4);
     expect(filters.minWeight).toBe(9.98);
   });

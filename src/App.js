@@ -201,6 +201,7 @@ function App() {
   const [originSearch, setOriginSearch] = useState("");
   const [destinationSearch, setDestinationSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [myAdsOnly, setMyAdsOnly] = useState(false);
   const [activeSearchMapKey, setActiveSearchMapKey] = useState("origin");
   const [searchMapPlaces, setSearchMapPlaces] = useState({ origin: null, destination: null });
   const [searchMapCoordinatePin, setSearchMapCoordinatePin] = useState(null);
@@ -212,7 +213,7 @@ function App() {
     postingLongitude: "",
     receptionLatitude: "",
     receptionLongitude: "",
-    radiusKm: "",
+    radius: "",
     postingFrom: "",
     postingTo: "",
     receptionFrom: "",
@@ -225,7 +226,8 @@ function App() {
     maxLength: "",
     minWeight: "",
     maxWeight: "",
-    userId: "",
+    ownerAgeRange: "",
+    ownerGender: "",
     sortBy: "",
     sortDir: "asc",
   }));
@@ -378,6 +380,7 @@ function App() {
       setToken("");
       setRole("");
       setUser(null);
+      setMyAdsOnly(false);
       setNotice("Your session expired. Please sign in again.");
     };
     const handleRefreshed = (event) => {
@@ -405,7 +408,10 @@ function App() {
         postingLongitude: parseSearchNumber(advancedFilters.postingLongitude),
         receptionLatitude: parseSearchNumber(advancedFilters.receptionLatitude),
         receptionLongitude: parseSearchNumber(advancedFilters.receptionLongitude),
-        radiusKm: parseSearchNumber(advancedFilters.radiusKm),
+        radiusKm: parseSearchNumber(
+          advancedFilters.radius,
+          getMeasurementSystem() === "imperial" ? 1.609344 : 1,
+        ),
         postingFrom: advancedFilters.postingFrom || undefined,
         postingTo: advancedFilters.postingTo || undefined,
         receptionFrom: advancedFilters.receptionFrom || undefined,
@@ -418,9 +424,9 @@ function App() {
         maxLength: parseSearchMeasurement(advancedFilters.maxLength, getMeasurementSystem() === "imperial" ? 2.54 : 1),
         minWeight: parseSearchMeasurement(advancedFilters.minWeight, getMeasurementSystem() === "imperial" ? 0.45359237 : 1),
         maxWeight: parseSearchMeasurement(advancedFilters.maxWeight, getMeasurementSystem() === "imperial" ? 0.45359237 : 1),
-        userId: Number.isSafeInteger(Number(advancedFilters.userId)) && Number(advancedFilters.userId) > 0
-          ? Number(advancedFilters.userId)
-          : undefined,
+        userId: myAdsOnly && user?.id != null ? user.id : undefined,
+        ownerAgeRange: advancedFilters.ownerAgeRange || undefined,
+        ownerGender: advancedFilters.ownerGender || undefined,
         sortBy: advancedFilters.sortBy || undefined,
         sortDir: advancedFilters.sortBy ? advancedFilters.sortDir : undefined,
       };
@@ -440,7 +446,7 @@ function App() {
     } finally {
       setLoadingAnnouncements(false);
     }
-  }, [search, originSearch, destinationSearch, typeFilter, advancedFilters, listingPage]);
+  }, [search, originSearch, destinationSearch, typeFilter, advancedFilters, myAdsOnly, user, listingPage]);
 
   useEffect(() => {
     const timer = window.setTimeout(loadAnnouncements, 250);
@@ -449,7 +455,7 @@ function App() {
 
   useEffect(() => {
     setListingPage(0);
-  }, [search, originSearch, destinationSearch, typeFilter, advancedFilters]);
+  }, [search, originSearch, destinationSearch, typeFilter, advancedFilters, myAdsOnly]);
 
   useEffect(() => {
     if (!token) {
@@ -467,6 +473,7 @@ function App() {
           setToken("");
           setUser(null);
           setRole("");
+          setMyAdsOnly(false);
         }
       });
     return () => {
@@ -569,6 +576,7 @@ function App() {
       setToken("");
       setUser(null);
       setRole("");
+      setMyAdsOnly(false);
       setConversations([]);
       setSupportConversations([]);
       setMessages([]);
@@ -588,6 +596,7 @@ function App() {
       setToken("");
       setRole("");
       setUser(null);
+      setMyAdsOnly(false);
       setConversations([]);
       setSupportConversations([]);
       setMessages([]);
@@ -779,8 +788,8 @@ function App() {
                 <label>Posting longitude
                   <input type="number" step="any" value={advancedFilters.postingLongitude} onFocus={() => setActiveSearchMapKey("postingLongitude")} onChange={(event) => { setSearchMapCoordinatePin(null); setAdvancedFilters((current) => ({ ...current, postingLongitude: event.target.value })); }} />
                 </label>
-                <label>Search radius (km)
-                  <input type="number" min="0" step="any" value={advancedFilters.radiusKm} onChange={(event) => setAdvancedFilters((current) => ({ ...current, radiusKm: event.target.value }))} />
+                <label>Search radius ({getMeasurementSystem() === "imperial" ? "mi" : "km"})
+                  <input type="number" min="0" step="any" value={advancedFilters.radius} onChange={(event) => setAdvancedFilters((current) => ({ ...current, radius: event.target.value }))} />
                 </label>
                 <label>Reception latitude
                   <input type="number" step="any" value={advancedFilters.receptionLatitude} onFocus={() => setActiveSearchMapKey("receptionLatitude")} onChange={(event) => { setSearchMapCoordinatePin(null); setAdvancedFilters((current) => ({ ...current, receptionLatitude: event.target.value })); }} />
@@ -814,8 +823,35 @@ function App() {
                     <input type="number" min="0" step="any" value={advancedFilters[key]} onChange={(event) => setAdvancedFilters((current) => ({ ...current, [key]: event.target.value }))} />
                   </label>
                 ))}
-                <label>Posted by user ID
-                  <input type="number" min="1" step="1" value={advancedFilters.userId} onChange={(event) => setAdvancedFilters((current) => ({ ...current, userId: event.target.value }))} />
+                <label className="terms-field my-ads-filter">
+                  <input
+                    type="checkbox"
+                    checked={myAdsOnly}
+                    disabled={!user}
+                    onChange={(event) => setMyAdsOnly(event.target.checked)}
+                  />
+                  <span>{user ? "Show only my ads" : "Sign in to filter your ads"}</span>
+                </label>
+                <label>Ad owner's age range
+                  <select value={advancedFilters.ownerAgeRange} onChange={(event) => setAdvancedFilters((current) => ({ ...current, ownerAgeRange: event.target.value }))}>
+                    <option value="">Any age range</option>
+                    <option value="UNDER_19">Under 19</option>
+                    <option value="RANGE_20_29">20-29</option>
+                    <option value="RANGE_30_39">30-39</option>
+                    <option value="RANGE_40_49">40-49</option>
+                    <option value="RANGE_50_59">50-59</option>
+                    <option value="RANGE_60_69">60-69</option>
+                    <option value="RANGE_70_79">70-79</option>
+                    <option value="RANGE_80_89">80-89</option>
+                    <option value="OVER_90">90 or older</option>
+                  </select>
+                </label>
+                <label>Ad owner's gender
+                  <select value={advancedFilters.ownerGender} onChange={(event) => setAdvancedFilters((current) => ({ ...current, ownerGender: event.target.value }))}>
+                    <option value="">Any gender</option>
+                    <option value="MALE">Male</option>
+                    <option value="FEMALE">Female</option>
+                  </select>
                 </label>
                 <label>Sort by
                   <select value={advancedFilters.sortBy} onChange={(event) => setAdvancedFilters((current) => ({ ...current, sortBy: event.target.value }))}>
