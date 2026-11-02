@@ -550,6 +550,12 @@ function App() {
     setMessages([...items].sort((left, right) => new Date(left.createdAt) - new Date(right.createdAt)));
     setMessagesHasMore(false);
   }, []);
+  const receiveMessage = useCallback((message) => {
+    setMessages((current) => {
+      if (current.some((item) => String(item.id) === String(message.id))) return current;
+      return [...current, message].sort((left, right) => new Date(left.createdAt) - new Date(right.createdAt));
+    });
+  }, []);
   const updateUnreadCount = useCallback((conversationId, unreadCount) => {
     const updatedUnreadCount = page === "messages"
       && inboxMode === "messages"
@@ -1069,6 +1075,12 @@ function App() {
                 }}
                 onUnreadCount={updateUnreadCount}
                 onPresence={updatePresence}
+                onIncomingMessage={(message) => receiveMessage({
+                  ...message,
+                  createdAt: new Date(message.createdAt),
+                  reactions: [],
+                  attachments: [],
+                })}
                 onDeleteMessage={async (messageId) => {
                   await apiRequest(`/messages/${messageId}`, { method: "DELETE", token });
                   setMessages((current) => current.filter((message) => String(message.id) !== String(messageId)));
@@ -2095,6 +2107,7 @@ function ConversationPanel({
   onSearchReset,
   onUnreadCount,
   onPresence,
+  onIncomingMessage,
   hasMore,
   loadingOlder,
   onLoadOlder,
@@ -2114,7 +2127,7 @@ function ConversationPanel({
   const lastReadId = useRef(null);
   const attachmentInput = useRef(null);
   const other = conversation.participants?.find((person) => String(person.id) !== String(user?.id)) || conversation.participants?.[0];
-  socketCallbacks.current = { onPresence, onUnreadCount, onRefreshMessages };
+  socketCallbacks.current = { onPresence, onUnreadCount, onRefreshMessages, onIncomingMessage };
   const sendTypingEvent = (type) => apiRequest("/typing", {
     method: "POST",
     token,
@@ -2148,7 +2161,14 @@ function ConversationPanel({
           if (payload.event === "TYPING_STOP" && String(payload.userId) !== String(user?.id)) setTyping(false);
           if (payload.event === "UNREAD_COUNT_UPDATE") socketCallbacks.current.onUnreadCount(conversation.id, payload.unreadCount);
           if (payload.event === "READ" && String(payload.userId) === String(user?.id)) socketCallbacks.current.onUnreadCount(conversation.id, 0);
-          if (["MESSAGE", "REACTION", "ATTACHMENT", "DELETED", "READ", "DELIVERED"].includes(payload.event)) {
+          if (payload.event === "MESSAGE") {
+            socketCallbacks.current.onIncomingMessage({
+              id: payload.id,
+              senderId: payload.senderId,
+              content: payload.content,
+              createdAt: payload.createdAt,
+            });
+          } else if (["REACTION", "ATTACHMENT", "DELETED", "READ", "DELIVERED"].includes(payload.event)) {
             window.clearTimeout(refreshTimer);
             refreshTimer = window.setTimeout(() => socketCallbacks.current.onRefreshMessages(), 100);
           }
