@@ -1028,6 +1028,7 @@ function App() {
                 onPresence={updatePresence}
                 onDeleteMessage={async (messageId) => {
                   await apiRequest(`/messages/${messageId}`, { method: "DELETE", token });
+                  setMessages((current) => current.filter((message) => String(message.id) !== String(messageId)));
                   await loadMessages(activeConversation);
                 }}
                 onReact={async (messageId, reaction) => {
@@ -2233,10 +2234,10 @@ function ConversationPanel({
         return <div key={message.id} className={`chat-message ${mine ? "mine" : ""}`}>
           <p>{message.content}</p>
           {message.attachments?.length > 0 && <div className="message-attachments">{message.attachments.map((attachment) => attachment.type?.startsWith("image/") ? <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer"><img src={attachment.url} alt="Shared attachment" /></a> : <a className="attachment-link" key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer"><Icon name="box" size={15} />{attachment.type?.split("/").pop() || "Download file"} · {(attachment.size / 1024).toFixed(0)} KB</a>)}</div>}
-          <div className="message-meta"><time>{formatDate(message.createdAt, { hour: "numeric", minute: "2-digit" })}</time>{mine && <button title="Delete message for everyone" onClick={async () => {
-            if (!window.confirm("Delete this message?")) return;
+          <div className="message-meta"><time>{formatDate(message.createdAt, { hour: "numeric", minute: "2-digit" })}</time><button title={mine ? "Delete message for everyone" : "Hide message for yourself"} onClick={async () => {
+            if (!window.confirm(mine ? "Delete this message for everyone?" : "Hide this message for yourself?")) return;
             try { await onDeleteMessage(message.id); } catch (failure) { setSendError(getErrorMessage(failure)); }
-          }}>Delete</button>}</div>
+          }}>Delete</button></div>
           <div className="reaction-bar">{["👍", "❤️", "😂", "🙏"].map((reaction) => <button key={reaction} className={myReaction === reaction ? "reacted" : ""} title={`React ${reaction}`} onClick={async () => {
             try { await onReact(message.id, myReaction === reaction ? null : reaction); } catch (failure) { setSendError(getErrorMessage(failure)); }
           }}>{reaction}<span>{message.reactions?.filter((item) => item.reaction === reaction).length || ""}</span></button>)}</div>
