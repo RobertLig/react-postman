@@ -2120,7 +2120,7 @@ function ConversationPanel({
   const [search, setSearch] = useState("");
   const [searchError, setSearchError] = useState("");
   const [blocked, setBlocked] = useState(false);
-  const [typingSent, setTypingSent] = useState(false);
+  const typingSent = useRef(false);
   const socketRef = useRef(null);
   const socketCallbacks = useRef({});
   const stopTypingTimer = useRef(null);
@@ -2206,19 +2206,19 @@ function ConversationPanel({
   const handleTyping = (value) => {
     setContent(value);
     if (!value.trim()) {
-      if (typingSent) sendTypingEvent("TYPING_STOP").catch(() => {});
-      setTypingSent(false);
+      if (typingSent.current) sendTypingEvent("TYPING_STOP").catch(() => {});
+      typingSent.current = false;
       window.clearTimeout(stopTypingTimer.current);
       return;
     }
-    if (!typingSent) {
-      setTypingSent(true);
+    if (!typingSent.current) {
+      typingSent.current = true;
       sendTypingEvent("TYPING_START").catch((failure) => setSendError(getErrorMessage(failure)));
     }
     window.clearTimeout(stopTypingTimer.current);
     stopTypingTimer.current = window.setTimeout(() => {
       sendTypingEvent("TYPING_STOP").catch((failure) => setSendError(getErrorMessage(failure)));
-      setTypingSent(false);
+      typingSent.current = false;
     }, 2200);
   };
 
@@ -2230,7 +2230,9 @@ function ConversationPanel({
     try {
       await onSend(content.trim());
       setContent("");
-      setTypingSent(false);
+      window.clearTimeout(stopTypingTimer.current);
+      if (typingSent.current) sendTypingEvent("TYPING_STOP").catch(() => {});
+      typingSent.current = false;
     } catch (failure) {
       setSendError(getErrorMessage(failure));
     } finally {
