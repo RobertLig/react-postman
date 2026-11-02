@@ -492,6 +492,10 @@ function App() {
     }
   }, [token]);
 
+  useEffect(() => {
+    if (token) loadConversations();
+  }, [loadConversations, token]);
+
   const loadSupportConversations = useCallback(async () => {
     if (!token) return;
     try {
@@ -547,12 +551,47 @@ function App() {
     setMessagesHasMore(false);
   }, []);
   const updateUnreadCount = useCallback((conversationId, unreadCount) => {
+    const updatedUnreadCount = page === "messages"
+      && inboxMode === "messages"
+      && String(activeConversationId) === String(conversationId)
+      ? 0
+      : unreadCount;
     const updateUnread = (current) => current.map((item) =>
-      String(item.id) === String(conversationId) ? { ...item, unreadCount } : item,
+      String(item.id) === String(conversationId) ? { ...item, unreadCount: updatedUnreadCount } : item,
     );
     setConversations(updateUnread);
     setSupportConversations(updateUnread);
-  }, []);
+  }, [activeConversationId, inboxMode, page]);
+  const notificationConversationId = conversations[0]?.id;
+  useEffect(() => {
+    if (!token || !notificationConversationId) return undefined;
+    let active = true;
+    let socket;
+    const connectTimer = window.setTimeout(() => {
+      if (!active) return;
+      try {
+        socket = new WebSocket(getWebSocketUrl(`/ws/chat/${notificationConversationId}?token=${encodeURIComponent(token)}`));
+        socket.onmessage = (event) => {
+          let payload;
+          try {
+            payload = JSON.parse(event.data);
+          } catch {
+            return;
+          }
+          if (payload.event === "UNREAD_COUNT_UPDATE") {
+            updateUnreadCount(payload.conversationId, payload.unreadCount);
+          }
+        };
+      } catch (failure) {
+        setNotice(getErrorMessage(failure));
+      }
+    }, 0);
+    return () => {
+      active = false;
+      window.clearTimeout(connectTimer);
+      if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) socket.close();
+    };
+  }, [notificationConversationId, token, updateUnreadCount]);
   const updatePresence = useCallback((userId, online) => {
     const updateConversationPresence = (current) => current.map((item) => {
       const other = item.participants?.find((person) => String(person.id) !== String(user?.id));
@@ -981,7 +1020,11 @@ function App() {
               {(inboxMode === "support" ? supportConversations : conversations).length ? (inboxMode === "support" ? supportConversations : conversations).map((conversation) => {
                 const other = conversation.participants?.find((person) => String(person.id) !== String(user?.id)) || conversation.participants?.[0];
                 return <div key={conversation.id} className={`conversation-row-wrap ${activeConversation?.id === conversation.id ? "selected" : ""}`}>
-                  <button className="conversation-row" onClick={() => { setActiveConversation(conversation); setActiveConversationIsSupport(inboxMode === "support"); }}>
+                  <button className="conversation-row" onClick={() => {
+                    setActiveConversation(conversation);
+                    setActiveConversationIsSupport(inboxMode === "support");
+                    if (inboxMode === "messages") updateUnreadCount(conversation.id, 0);
+                  }}>
                   <span className="avatar conversation-avatar">{other?.photoUrl ? <img src={other.photoUrl} alt="" /> : (other?.name || (inboxMode === "support" && role === "ADMIN" ? "Member" : "Support")).slice(0, 1).toUpperCase()}</span>
                   <span className="conversation-meta"><b>{inboxMode === "support" && role !== "ADMIN" ? "Wayline Support" : other?.name || "Wayline member"}</b><small>{conversation.otherUserOnline ? "Online now" : inboxMode === "support" ? "Support conversation" : "Open conversation"}</small></span>
                   {conversation.unreadCount > 0 && <span className="unread-count">{conversation.unreadCount}</span>}
@@ -2066,10 +2109,12 @@ function ConversationPanel({
   const [blocked, setBlocked] = useState(false);
   const [typingSent, setTypingSent] = useState(false);
   const socketRef = useRef(null);
+  const socketCallbacks = useRef({});
   const stopTypingTimer = useRef(null);
   const lastReadId = useRef(null);
   const attachmentInput = useRef(null);
   const other = conversation.participants?.find((person) => String(person.id) !== String(user?.id)) || conversation.participants?.[0];
+  socketCallbacks.current = { onPresence, onUnreadCount, onRefreshMessages };
   const sendTypingEvent = (type) => apiRequest("/typing", {
     method: "POST",
     token,
@@ -2098,14 +2143,14 @@ function ConversationPanel({
             return;
           }
           if (payload.conversationId && String(payload.conversationId) !== String(conversation.id)) return;
-          if (payload.event === "PRESENCE") onPresence(payload.userId, payload.online);
+          if (payload.event === "PRESENCE") socketCallbacks.current.onPresence(payload.userId, payload.online);
           if (payload.event === "TYPING_START" && String(payload.userId) !== String(user?.id)) setTyping(true);
           if (payload.event === "TYPING_STOP" && String(payload.userId) !== String(user?.id)) setTyping(false);
-          if (payload.event === "UNREAD_COUNT_UPDATE") onUnreadCount(conversation.id, payload.unreadCount);
-          if (payload.event === "READ" && String(payload.userId) === String(user?.id)) onUnreadCount(conversation.id, 0);
+          if (payload.event === "UNREAD_COUNT_UPDATE") socketCallbacks.current.onUnreadCount(conversation.id, payload.unreadCount);
+          if (payload.event === "READ" && String(payload.userId) === String(user?.id)) socketCallbacks.current.onUnreadCount(conversation.id, 0);
           if (["MESSAGE", "REACTION", "ATTACHMENT", "DELETED", "READ", "DELIVERED"].includes(payload.event)) {
             window.clearTimeout(refreshTimer);
-            refreshTimer = window.setTimeout(onRefreshMessages, 100);
+            refreshTimer = window.setTimeout(() => socketCallbacks.current.onRefreshMessages(), 100);
           }
         };
       } catch {
@@ -2119,7 +2164,7 @@ function ConversationPanel({
       if (socketRef.current === socket) socketRef.current = null;
       if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) socket.close();
     };
-  }, [conversation?.id, onPresence, onRefreshMessages, onUnreadCount, token, user?.id]);
+  }, [conversation?.id, token, user?.id]);
 
   useEffect(() => {
     const latestIncoming = [...messages]
