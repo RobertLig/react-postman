@@ -82,6 +82,10 @@ function getErrorMessage(error) {
   return error?.message || "Something went wrong. Please try again.";
 }
 
+function getOtherParticipant(conversation, user) {
+  return conversation.participants?.find((person) => String(person.id) !== String(user?.id));
+}
+
 function parseSearchNumber(value, factor = 1) {
   if (value === "") return undefined;
   const number = Number(value);
@@ -1024,7 +1028,7 @@ function App() {
               </div>
               <div className="inbox-label">{inboxMode === "support" && role === "ADMIN" ? "OPEN REQUESTS" : inboxMode === "support" ? "SUPPORT THREADS" : "MESSAGES"} <span>{(inboxMode === "support" ? supportConversations : conversations).length}</span></div>
               {(inboxMode === "support" ? supportConversations : conversations).length ? (inboxMode === "support" ? supportConversations : conversations).map((conversation) => {
-                const other = conversation.participants?.find((person) => String(person.id) !== String(user?.id)) || conversation.participants?.[0];
+                const other = getOtherParticipant(conversation, user);
                 return <div key={conversation.id} className={`conversation-row-wrap ${activeConversation?.id === conversation.id ? "selected" : ""}`}>
                   <button className="conversation-row" onClick={() => {
                     setActiveConversation(conversation);
@@ -1032,7 +1036,7 @@ function App() {
                     if (inboxMode === "messages") updateUnreadCount(conversation.id, 0);
                   }}>
                   <span className="avatar conversation-avatar">{other?.photoUrl ? <img src={other.photoUrl} alt="" /> : (other?.name || (inboxMode === "support" && role === "ADMIN" ? "Member" : "Support")).slice(0, 1).toUpperCase()}</span>
-                  <span className="conversation-meta"><b>{inboxMode === "support" && role !== "ADMIN" ? "Wayline Support" : other?.name || "Wayline member"}</b><small>{conversation.otherUserOnline ? "Online now" : inboxMode === "support" ? "Support conversation" : "Open conversation"}</small></span>
+                  <span className="conversation-meta"><b>{inboxMode === "support" && role !== "ADMIN" ? "Wayline Support" : other?.name || (inboxMode === "support" && role === "ADMIN" ? "Member" : "Wayline member")}</b><small>{conversation.otherUserOnline ? "Online now" : inboxMode === "support" ? "Support conversation" : "Open conversation"}</small></span>
                   {conversation.unreadCount > 0 && <span className="unread-count">{conversation.unreadCount}</span>}
                   </button>
                   {inboxMode === "messages" && <button className="conversation-dismiss" title="Hide conversation" onClick={() => handleConversationVisibility(conversation)} aria-label={`Hide conversation with ${other?.name || "member"}`}>×</button>}
@@ -2126,7 +2130,9 @@ function ConversationPanel({
   const stopTypingTimer = useRef(null);
   const lastReadId = useRef(null);
   const attachmentInput = useRef(null);
-  const other = conversation.participants?.find((person) => String(person.id) !== String(user?.id)) || conversation.participants?.[0];
+  const other = getOtherParticipant(conversation, user);
+  const hasOtherParticipant = !Array.isArray(conversation.participants)
+    || Boolean(other);
   socketCallbacks.current = { onPresence, onUnreadCount, onRefreshMessages, onIncomingMessage };
   const sendTypingEvent = (type) => apiRequest("/typing", {
     method: "POST",
@@ -2224,7 +2230,7 @@ function ConversationPanel({
 
   const submit = async (event) => {
     event.preventDefault();
-    if (!content.trim()) return;
+    if (!content.trim() || !hasOtherParticipant) return;
     setSending(true);
     setSendError("");
     try {
@@ -2243,7 +2249,7 @@ function ConversationPanel({
   const uploadAttachments = async (event) => {
     const files = Array.from(event.target.files || []);
     event.target.value = "";
-    if (!files.length) return;
+    if (!files.length || !hasOtherParticipant) return;
     if (files.length > 10) {
       setSendError("You can attach up to 10 files to a message.");
       return;
@@ -2313,8 +2319,8 @@ function ConversationPanel({
       {typing && <div className="typing-indicator"><i /><i /><i />{other?.name || "They"} is typing</div>}
       {!messages.length && !error && <div className="chat-welcome"><Icon name="message" size={23} /><p>Say hello and start planning your journey together.</p></div>}
     </div>
-    <form className="chat-compose" onSubmit={submit}><input ref={attachmentInput} type="file" multiple hidden onChange={uploadAttachments} /><button type="button" className="attach-button" aria-label="Attach files" title="Attach files (max 5 MB each)" disabled={sending || blocked} onClick={() => attachmentInput.current?.click()}><Icon name="plus" size={19} /></button><input aria-label="Write a message" value={content} maxLength="2000" disabled={blocked} onChange={(event) => handleTyping(event.target.value)} placeholder={blocked ? "This conversation is blocked." : "Write a message..."} /><button disabled={!content.trim() || sending || blocked} aria-label="Send message"><Icon name="arrow" size={19} /></button></form>
-    {(sendError || !token || connection === "unavailable") && <p className="chat-error">{sendError || (!token ? "Sign in to send messages." : "Live updates are unavailable. Messages can still be sent.")}</p>}
+    <form className="chat-compose" onSubmit={submit}><input ref={attachmentInput} type="file" multiple hidden onChange={uploadAttachments} /><button type="button" className="attach-button" aria-label="Attach files" title="Attach files (max 5 MB each)" disabled={sending || blocked || !hasOtherParticipant} onClick={() => attachmentInput.current?.click()}><Icon name="plus" size={19} /></button><input aria-label="Write a message" value={content} maxLength="2000" disabled={blocked || !hasOtherParticipant} onChange={(event) => handleTyping(event.target.value)} placeholder={!hasOtherParticipant ? "No other participant in this conversation." : blocked ? "This conversation is blocked." : "Write a message..."} /><button disabled={!content.trim() || sending || blocked || !hasOtherParticipant} aria-label="Send message"><Icon name="arrow" size={19} /></button></form>
+    {(!hasOtherParticipant || sendError || !token || connection === "unavailable") && <p className="chat-error" role={!hasOtherParticipant ? "alert" : undefined}>{!hasOtherParticipant ? "This conversation has no other participant, so you can’t send a message to yourself." : sendError || (!token ? "Sign in to send messages." : "Live updates are unavailable. Messages can still be sent.")}</p>}
   </div>;
 }
 

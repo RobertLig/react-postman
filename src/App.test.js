@@ -40,6 +40,32 @@ test("renders and loads route listings", async () => {
   ));
 });
 
+test("prevents an admin from sending a support reply to a self-only conversation", async () => {
+  const token = `header.${btoa(JSON.stringify({ groups: "ADMIN" }))}.signature`;
+  window.sessionStorage.setItem("wayline.accessToken", token);
+  window.fetch.mockImplementation(async (input) => {
+    const path = new URL(String(input)).pathname;
+    const result = path === "/users/me"
+      ? { id: 42, name: "Admin User" }
+      : path === "/conversations/support"
+        ? [{ id: 90, participants: [{ id: 42, name: "Admin User" }] }]
+        : path === "/conversations/90/messages"
+          ? { messages: [], hasMore: false }
+          : { items: [], totalItems: 0 };
+    return { ok: true, text: async () => JSON.stringify(result) };
+  });
+
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: /^Messages/ }));
+  fireEvent.click(await screen.findByRole("button", { name: "Support queue" }));
+  fireEvent.click(await screen.findByRole("button", { name: /Member.*Support conversation/ }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent("can’t send a message to yourself");
+  expect(screen.getByRole("textbox", { name: "Write a message" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Send message" })).toBeDisabled();
+  expect(window.fetch.mock.calls.some(([url]) => String(url).includes("/messages/support/reply"))).toBe(false);
+});
+
 test("sends the advanced announcement filters in the backend search format", async () => {
   Object.defineProperty(window.navigator, "language", { configurable: true, value: "pl-PL" });
   render(<App />);
