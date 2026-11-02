@@ -3,13 +3,43 @@ const TOKEN_KEY = "wayline.accessToken";
 const USER_KEY = "wayline.user";
 let refreshPromise;
 
+function resolveRole(claims) {
+  const roles = claims.flatMap((claim) => Array.isArray(claim) ? claim : claim ? [claim] : [])
+    .map((claim) => typeof claim === "string" ? claim : claim?.authority || claim?.name || "")
+    .filter(Boolean);
+  const adminRole = roles.find((role) => role.replace(/^ROLE_/i, "").toUpperCase() === "ADMIN");
+  return adminRole ? "ADMIN" : roles[0] || "";
+}
+
+export function getUserRole(user) {
+  if (!user || typeof user !== "object") return "";
+  return resolveRole([
+    user.role,
+    user.roles,
+    user.authorities,
+    user.groups,
+    user.userRole,
+    user.user_role,
+    user.userType,
+  ]);
+}
+
 export function getTokenRole(token) {
   if (!token) return "";
   try {
     const payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
     const claims = JSON.parse(window.atob(payload.padEnd(Math.ceil(payload.length / 4) * 4, "=")));
-    const groups = claims.groups;
-    return Array.isArray(groups) ? groups[0] || "" : groups || "";
+    return resolveRole([
+      claims.groups,
+      claims["cognito:groups"],
+      claims.roles,
+      claims.authorities,
+      claims.role,
+      claims.userRole,
+      claims.user_role,
+      claims.userType,
+      claims.realm_access?.roles,
+    ]);
   } catch {
     return "";
   }

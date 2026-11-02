@@ -41,12 +41,12 @@ test("renders and loads route listings", async () => {
 });
 
 test("prevents an admin from sending a support reply to a self-only conversation", async () => {
-  const token = `header.${btoa(JSON.stringify({ groups: "ADMIN" }))}.signature`;
+  const token = "profile-role-token";
   window.sessionStorage.setItem("wayline.accessToken", token);
   window.fetch.mockImplementation(async (input) => {
     const path = new URL(String(input)).pathname;
     const result = path === "/users/me"
-      ? { id: 42, name: "Admin User" }
+      ? { id: 42, name: "Admin User", role: "ADMIN" }
       : path === "/conversations/support"
         ? [{ id: 90, participants: [{ id: 42, name: "Admin User" }] }]
         : path === "/conversations/90/messages"
@@ -58,6 +58,7 @@ test("prevents an admin from sending a support reply to a self-only conversation
   render(<App />);
   fireEvent.click(screen.getByRole("button", { name: /^Messages/ }));
   fireEvent.click(await screen.findByRole("button", { name: "Support queue" }));
+  expect(screen.getByText("OPEN REQUESTS")).toBeInTheDocument();
   fireEvent.click(await screen.findByRole("button", { name: /Member.*Support conversation/ }));
 
   expect(await screen.findByRole("alert")).toHaveTextContent("can’t send a message to yourself");

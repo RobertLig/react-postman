@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   apiRequest,
   getTokenRole,
+  getUserRole,
   getWebSocketUrl,
   getStoredToken,
   saveSession,
@@ -470,7 +471,15 @@ function App() {
     let active = true;
     apiRequest("/users/me", { token })
       .then((profile) => {
-        if (active) setUser(profile);
+        if (active) {
+          setUser(profile);
+          const profileRole = getUserRole(profile);
+          if (profileRole) {
+            setRole((currentRole) => currentRole === "ADMIN" || profileRole !== "ADMIN"
+              ? currentRole || profileRole
+              : profileRole);
+          }
+        }
       })
       .catch(() => {
         if (active) {
@@ -628,7 +637,8 @@ function App() {
     saveSession(authResponse.token, authResponse.user);
     setToken(authResponse.token);
     setUser(authResponse.user);
-    setRole(getTokenRole(authResponse.token));
+    const tokenRole = getTokenRole(authResponse.token);
+    setRole(tokenRole === "ADMIN" ? tokenRole : getUserRole(authResponse.user) || tokenRole);
     setAuthOpen(false);
     setNotice(`Welcome${authResponse.user?.name ? `, ${authResponse.user.name.split(" ")[0]}` : ""}!`);
   };

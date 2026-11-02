@@ -1,4 +1,4 @@
-import { apiRequest, clearSession, getTokenRole, uploadFile } from "./api";
+import { apiRequest, clearSession, getTokenRole, getUserRole, uploadFile } from "./api";
 
 function response(status, payload) {
   return {
@@ -16,6 +16,12 @@ beforeEach(() => {
 test("reads the role claim for role-gated UI", () => {
   const payload = window.btoa(JSON.stringify({ groups: ["ADMIN"] }));
   expect(getTokenRole(`header.${payload}.signature`)).toBe("ADMIN");
+  const authorityPayload = window.btoa(JSON.stringify({ authorities: ["ROLE_ADMIN"] }));
+  expect(getTokenRole(`header.${authorityPayload}.signature`)).toBe("ADMIN");
+  const realmPayload = window.btoa(JSON.stringify({ realm_access: { roles: ["ROLE_ADMIN"] } }));
+  expect(getTokenRole(`header.${realmPayload}.signature`)).toBe("ADMIN");
+  expect(getUserRole({ role: "ADMIN" })).toBe("ADMIN");
+  expect(getUserRole({ authorities: [{ authority: "ROLE_ADMIN" }] })).toBe("ADMIN");
   expect(getTokenRole("invalid-token")).toBe("");
 });
 
