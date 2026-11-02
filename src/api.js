@@ -15,6 +15,17 @@ export function getTokenRole(token) {
   }
 }
 
+function getTokenExpiration(token) {
+  if (!token) return null;
+  try {
+    const payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const claims = JSON.parse(window.atob(payload.padEnd(Math.ceil(payload.length / 4) * 4, "=")));
+    return typeof claims.exp === "number" ? claims.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
 export function getWebSocketUrl(path) {
   const url = new URL(`${API_URL}${path}`);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
@@ -73,6 +84,18 @@ async function refreshAccessToken() {
 }
 
 export async function apiRequest(path, { method = "GET", body, token, headers = {} } = {}, retry = true) {
+  const expiresAt = getTokenExpiration(token);
+  if (token && retry && expiresAt !== null && expiresAt <= Date.now() + 30_000) {
+    try {
+      token = await refreshAccessToken();
+    } catch (error) {
+      clearSession();
+      window.dispatchEvent(new Event("wayline:session-expired"));
+      if (error.message === "Session expired. Please sign in again.") throw error;
+      throw new Error("Session expired. Please sign in again.");
+    }
+  }
+
   const requestHeaders = {
     Accept: "application/json",
     "Accept-Language": navigator.language || "en",

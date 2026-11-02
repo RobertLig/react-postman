@@ -40,6 +40,30 @@ test("refreshes an expired access token and retries the request", async () => {
   clearSession();
 });
 
+test("refreshes a token before it expires to avoid an unauthorized request", async () => {
+  const payload = window.btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 5 }))
+    .replace(/=/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
+  window.fetch
+    .mockResolvedValueOnce(response(200, { token: "fresh-token" }))
+    .mockResolvedValueOnce(response(200, { id: 8 }));
+
+  await expect(apiRequest("/conversations/support", { token: `header.${payload}.signature` }))
+    .resolves.toEqual({ id: 8 });
+
+  expect(window.fetch).toHaveBeenNthCalledWith(
+    1,
+    expect.stringContaining("/auth/refresh"),
+    expect.objectContaining({ method: "POST", credentials: "include" }),
+  );
+  expect(window.fetch).toHaveBeenNthCalledWith(
+    2,
+    expect.stringContaining("/conversations/support"),
+    expect.objectContaining({ headers: expect.objectContaining({ Authorization: expect.any(String) }) }),
+  );
+});
+
 test("uploads the selected file using the signed content type", async () => {
   window.fetch.mockResolvedValueOnce(response(200, null));
   const file = new File(["photo"], "route.png", { type: "image/png" });
