@@ -630,8 +630,9 @@ function App() {
   }, [user?.id]);
 
   useEffect(() => {
-    loadMessages(activeConversationId ? { id: activeConversationId } : null);
-  }, [activeConversationId, loadMessages]);
+    if (page !== "messages" || !activeConversationId) return;
+    loadMessages({ id: activeConversationId });
+  }, [activeConversationId, loadMessages, page]);
 
   const handleAuth = (authResponse) => {
     saveSession(authResponse.token, authResponse.user);

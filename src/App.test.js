@@ -233,6 +233,72 @@ test.each([
     new URL(String(url)).pathname === "/conversations/90/restore" && options.method === "POST")).toBe(true);
 });
 
+test.each([
+  {
+    role: "USER",
+    currentUser: { id: 7, name: "Regular User", role: "USER" },
+    otherUser: { id: 88, name: "Support Agent" },
+    inboxButton: "Support",
+    conversationButton: /Wayline Support.*Support conversation/,
+  },
+  {
+    role: "ADMIN",
+    currentUser: { id: 42, name: "Admin User", role: "ADMIN" },
+    otherUser: { id: 7, name: "Member" },
+    inboxButton: "Support queue",
+    conversationButton: /Member.*Support conversation/,
+  },
+])("refreshes the selected support conversation after returning from another page as $role", async ({
+  currentUser,
+  otherUser,
+  inboxButton,
+  conversationButton,
+}) => {
+  const token = "support-refresh-token";
+  let latestMessageAvailable = false;
+  const initialMessage = {
+    id: 91,
+    senderId: otherUser.id,
+    content: "Earlier support message",
+    createdAt: "2026-10-28T10:00:00Z",
+  };
+  const latestMessage = {
+    id: 92,
+    senderId: otherUser.id,
+    content: "New support message",
+    createdAt: "2026-10-28T10:01:00Z",
+  };
+  window.sessionStorage.setItem("wayline.accessToken", token);
+  window.fetch.mockImplementation(async (input) => {
+    const url = new URL(String(input));
+    const result = url.pathname === "/users/me"
+      ? currentUser
+      : url.pathname === "/conversations/support"
+        ? [{ id: 90, participants: [currentUser, otherUser] }]
+        : url.pathname === "/conversations/90/messages"
+          ? {
+            messages: latestMessageAvailable ? [initialMessage, latestMessage] : [initialMessage],
+            hasMore: false,
+          }
+          : { items: [], totalItems: 0 };
+    return { ok: true, text: async () => JSON.stringify(result) };
+  });
+
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: /^Messages/ }));
+  fireEvent.click(await screen.findByRole("button", { name: inboxButton }));
+  fireEvent.click(await screen.findByRole("button", { name: conversationButton }));
+  expect(await screen.findByText("Earlier support message")).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: /^Find deliveries/ }));
+  latestMessageAvailable = true;
+  fireEvent.click(screen.getByRole("button", { name: /^Messages/ }));
+
+  expect(await screen.findByText("New support message")).toBeInTheDocument();
+  expect(window.fetch.mock.calls.filter(([input]) =>
+    new URL(String(input)).pathname === "/conversations/90/messages")).toHaveLength(2);
+});
+
 test("sends the advanced announcement filters in the backend search format", async () => {
   Object.defineProperty(window.navigator, "language", { configurable: true, value: "pl-PL" });
   render(<App />);
