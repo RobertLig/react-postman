@@ -121,6 +121,118 @@ test.each([
   expect(await screen.findByRole("button", { name: "Unblock" })).toBeInTheDocument();
 });
 
+test.each([
+  {
+    role: "USER",
+    currentUser: { id: 7, name: "Regular User", role: "USER" },
+    otherUser: { id: 88, name: "Support Agent" },
+    inboxButton: "Support",
+    conversationButton: /Wayline Support.*Support conversation/,
+  },
+  {
+    role: "ADMIN",
+    currentUser: { id: 42, name: "Admin User", role: "ADMIN" },
+    otherUser: { id: 7, name: "Member" },
+    inboxButton: "Support queue",
+    conversationButton: /Member.*Support conversation/,
+  },
+])("searches messages in $role support conversations", async ({
+  currentUser,
+  otherUser,
+  inboxButton,
+  conversationButton,
+}) => {
+  const token = "support-search-token";
+  window.sessionStorage.setItem("wayline.accessToken", token);
+  window.fetch.mockImplementation(async (input) => {
+    const url = new URL(String(input));
+    const result = url.pathname === "/users/me"
+      ? currentUser
+      : url.pathname === "/conversations/support"
+        ? [{ id: 90, participants: [currentUser, otherUser] }]
+        : url.pathname === "/conversations/90/messages"
+          ? { messages: [], hasMore: false }
+          : url.pathname === "/conversations/90/search"
+            ? { messages: [{ id: 91, senderId: otherUser.id, content: "Found support answer", createdAt: "2026-10-28T10:00:00Z" }] }
+            : { items: [], totalItems: 0 };
+    return { ok: true, text: async () => JSON.stringify(result) };
+  });
+
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: /^Messages/ }));
+  fireEvent.click(await screen.findByRole("button", { name: inboxButton }));
+  fireEvent.click(await screen.findByRole("button", { name: conversationButton }));
+  fireEvent.change(await screen.findByRole("textbox", { name: "Search this conversation" }), {
+    target: { value: "billing help" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Search messages" }));
+
+  expect(await screen.findByText("Found support answer")).toBeInTheDocument();
+  await waitFor(() => {
+    const searchRequest = window.fetch.mock.calls.find(([input]) => new URL(String(input)).pathname === "/conversations/90/search");
+    expect(searchRequest).toBeDefined();
+    expect(new URL(String(searchRequest[0])).searchParams.get("query")).toBe("billing help");
+  });
+});
+
+test.each([
+  {
+    role: "USER",
+    currentUser: { id: 7, name: "Regular User", role: "USER" },
+    otherUser: { id: 88, name: "Support Agent" },
+    inboxButton: "Support",
+    conversationButton: /Wayline Support.*Support conversation/,
+    hideLabel: "Hide conversation with Support Agent",
+  },
+  {
+    role: "ADMIN",
+    currentUser: { id: 42, name: "Admin User", role: "ADMIN" },
+    otherUser: { id: 7, name: "Member" },
+    inboxButton: "Support queue",
+    conversationButton: /Member.*Support conversation/,
+    hideLabel: "Hide conversation with Member",
+  },
+])("hides and restores support conversations for $role", async ({
+  currentUser,
+  otherUser,
+  inboxButton,
+  conversationButton,
+  hideLabel,
+}) => {
+  const token = "support-hide-token";
+  let hidden = false;
+  window.sessionStorage.setItem("wayline.accessToken", token);
+  window.fetch.mockImplementation(async (input, options = {}) => {
+    const url = new URL(String(input));
+    if (url.pathname === "/conversations/90" && options.method === "DELETE") hidden = true;
+    if (url.pathname === "/conversations/90/restore" && options.method === "POST") hidden = false;
+    const result = url.pathname === "/users/me"
+      ? currentUser
+      : url.pathname === "/conversations/support"
+        ? hidden ? [] : [{ id: 90, participants: [currentUser, otherUser] }]
+        : url.pathname === "/conversations/90/messages"
+          ? { messages: [], hasMore: false }
+          : { items: [], totalItems: 0 };
+    return { ok: true, text: async () => JSON.stringify(result) };
+  });
+
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: /^Messages/ }));
+  fireEvent.click(await screen.findByRole("button", { name: inboxButton }));
+  fireEvent.click(await screen.findByRole("button", { name: conversationButton }));
+  fireEvent.click(screen.getByRole("button", { name: hideLabel }));
+
+  const restoreButton = await screen.findByRole("button", { name: "Restore recently hidden conversation" });
+  expect(hidden).toBe(true);
+  fireEvent.click(restoreButton);
+  expect(await screen.findByRole("button", { name: conversationButton })).toBeInTheDocument();
+  expect(hidden).toBe(false);
+  expect(window.fetch.mock.calls.some(([url, options]) =>
+    new URL(String(url)).pathname === "/conversations/90" && options.method === "DELETE")).toBe(true);
+  expect(window.fetch.mock.calls.some(([url, options]) =>
+    new URL(String(url)).pathname === "/conversations/90/restore" && options.method === "POST")).toBe(true);
+});
+
 test("sends the advanced announcement filters in the backend search format", async () => {
   Object.defineProperty(window.navigator, "language", { configurable: true, value: "pl-PL" });
   render(<App />);

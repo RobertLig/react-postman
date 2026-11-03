@@ -690,18 +690,22 @@ function App() {
   };
 
   const handleConversationVisibility = async (conversation) => {
+    const isSupport = Boolean(conversation.isSupport);
+    const targetConversation = conversation.conversation || conversation;
     try {
-      if (conversation.deletedAt) {
-        await apiRequest(`/conversations/${conversation.id}/restore`, { method: "POST", token });
+      if (targetConversation.deletedAt) {
+        await apiRequest(`/conversations/${targetConversation.id}/restore`, { method: "POST", token });
         setRecentlyHiddenConversation(null);
         setNotice("Conversation restored.");
       } else {
-        await apiRequest(`/conversations/${conversation.id}`, { method: "DELETE", token });
-        setConversations((current) => current.filter((item) => item.id !== conversation.id));
-        setRecentlyHiddenConversation(conversation);
-        setActiveConversation(null);
+        await apiRequest(`/conversations/${targetConversation.id}`, { method: "DELETE", token });
+        if (isSupport) setSupportConversations((current) => current.filter((item) => item.id !== targetConversation.id));
+        else setConversations((current) => current.filter((item) => item.id !== targetConversation.id));
+        setRecentlyHiddenConversation({ conversation: targetConversation, isSupport });
+        if (String(activeConversation?.id) === String(targetConversation.id)) setActiveConversation(null);
       }
-      await loadConversations();
+      if (isSupport) await loadSupportConversations();
+      else await loadConversations();
     } catch (error) {
       setNotice(getErrorMessage(error));
     }
@@ -1049,10 +1053,10 @@ function App() {
                   <span className="conversation-meta"><b>{inboxMode === "support" && role !== "ADMIN" ? "Wayline Support" : other?.name || (inboxMode === "support" && role === "ADMIN" ? "Member" : "Wayline member")}</b><small>{conversation.otherUserOnline ? "Online now" : inboxMode === "support" ? "Support conversation" : "Open conversation"}</small></span>
                   {conversation.unreadCount > 0 && <span className="unread-count">{conversation.unreadCount}</span>}
                   </button>
-                  {inboxMode === "messages" && <button className="conversation-dismiss" title="Hide conversation" onClick={() => handleConversationVisibility(conversation)} aria-label={`Hide conversation with ${other?.name || "member"}`}>×</button>}
+                  <button className="conversation-dismiss" title="Hide conversation" onClick={() => handleConversationVisibility({ conversation, isSupport: inboxMode === "support" })} aria-label={`Hide conversation with ${other?.name || "member"}`}>×</button>
                 </div>;
               }) : <div className="conversation-empty">Your conversations will appear here when you connect with someone on a route.</div>}
-              {inboxMode === "messages" && recentlyHiddenConversation && <button className="restore-conversation" onClick={() => handleConversationVisibility({ ...recentlyHiddenConversation, deletedAt: true })}>Restore recently hidden conversation</button>}
+              {recentlyHiddenConversation?.isSupport === (inboxMode === "support") && <button className="restore-conversation" onClick={() => handleConversationVisibility({ ...recentlyHiddenConversation, conversation: { ...recentlyHiddenConversation.conversation, deletedAt: true } })}>Restore recently hidden conversation</button>}
               {inboxMode === "support" && role !== "ADMIN" && <button className="new-support-button" onClick={() => setSupportComposerOpen(true)}><Icon name="plus" size={15} />Contact support</button>}
             </aside>
             <section className="message-panel">
@@ -2299,7 +2303,7 @@ function ConversationPanel({
   };
 
   return <div className="chat-panel">
-    <div className="chat-header"><span className="avatar">{other?.photoUrl ? <img src={other.photoUrl} alt="" /> : (other?.name || "U").slice(0, 1).toUpperCase()}</span><div><b>{isSupport && role === "ADMIN" ? other?.name || "Member" : isSupport ? "Wayline Support" : other?.name || "Wayline member"}</b><small>{connection === "connected" ? "Live connection" : conversation.otherUserOnline ? "Online now" : "A Wayline conversation"}</small></div>{!isSupport && <form className="chat-search" onSubmit={startSearch}><input aria-label="Search this conversation" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" /><button aria-label="Search messages"><Icon name="search" size={15} /></button>{search && <button type="button" aria-label="Clear search" onClick={() => { setSearch(""); setSearchError(""); onSearchReset(); }}><Icon name="close" size={13} /></button>}</form>}<span className="chat-header-badge"><Icon name="check" size={14} />{connection === "connected" ? "Live chat" : "Private chat"}</span>{other?.id && <button className="block-user-button" onClick={async () => {
+    <div className="chat-header"><span className="avatar">{other?.photoUrl ? <img src={other.photoUrl} alt="" /> : (other?.name || "U").slice(0, 1).toUpperCase()}</span><div><b>{isSupport && role === "ADMIN" ? other?.name || "Member" : isSupport ? "Wayline Support" : other?.name || "Wayline member"}</b><small>{connection === "connected" ? "Live connection" : conversation.otherUserOnline ? "Online now" : "A Wayline conversation"}</small></div><form className="chat-search" onSubmit={startSearch}><input aria-label="Search this conversation" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" /><button aria-label="Search messages"><Icon name="search" size={15} /></button>{search && <button type="button" aria-label="Clear search" onClick={() => { setSearch(""); setSearchError(""); onSearchReset(); }}><Icon name="close" size={13} /></button>}</form><span className="chat-header-badge"><Icon name="check" size={14} />{connection === "connected" ? "Live chat" : "Private chat"}</span>{other?.id && <button className="block-user-button" onClick={async () => {
       if (!window.confirm(`Block ${other.name || "this member"}? They will no longer be able to message you.`)) return;
       try {
         await onBlock(other.id, blocked);
