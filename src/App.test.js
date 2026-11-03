@@ -92,6 +92,71 @@ test("shows the Messages nav dot for an unread update in any conversation", asyn
   }
 });
 
+test("does not mark a previous conversation message as read after switching conversations", async () => {
+  const token = "conversation-read-token";
+  const originalWebSocket = window.WebSocket;
+  const conversations = [
+    { id: 10, participants: [{ id: 7, name: "Current User" }, { id: 80, name: "Alex" }] },
+    { id: 20, participants: [{ id: 7, name: "Current User" }, { id: 90, name: "Sam" }] },
+  ];
+  const readEvents = [];
+  window.sessionStorage.setItem("wayline.accessToken", token);
+  window.WebSocket = class MockWebSocket {
+    static OPEN = 1;
+    static CONNECTING = 0;
+
+    constructor() {
+      this.readyState = MockWebSocket.CONNECTING;
+    }
+
+    close() {
+      this.readyState = 3;
+    }
+  };
+  window.fetch.mockImplementation(async (input, options = {}) => {
+    const path = new URL(String(input)).pathname;
+    let result = { items: [], totalItems: 0 };
+    if (path === "/users/me") result = { id: 7, name: "Current User" };
+    if (path === "/conversations/list") result = conversations;
+    if (path === "/conversations/10/messages") {
+      result = {
+        messages: [{ id: 101, senderId: 80, content: "Message from Alex", createdAt: "2026-10-28T10:00:00Z" }],
+        hasMore: false,
+      };
+    }
+    if (path === "/conversations/20/messages") {
+      result = {
+        messages: [{ id: 201, senderId: 90, content: "Message from Sam", createdAt: "2026-10-28T11:00:00Z" }],
+        hasMore: false,
+      };
+    }
+    if (path === "/events") readEvents.push(JSON.parse(options.body));
+    return { ok: true, text: async () => JSON.stringify(result) };
+  });
+
+  try {
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: /^Messages/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Alex.*Open conversation/ }));
+    expect(await screen.findByText("Message from Alex")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(readEvents).toContainEqual({ conversationId: 10, messageId: 101, type: "READ" });
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Find deliveries" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Messages/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Sam.*Open conversation/ }));
+    expect(await screen.findByText("Message from Sam")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(readEvents).toContainEqual({ conversationId: 20, messageId: 201, type: "READ" });
+    });
+
+    expect(readEvents).not.toContainEqual({ conversationId: 20, messageId: 101, type: "READ" });
+  } finally {
+    window.WebSocket = originalWebSocket;
+  }
+});
+
 test("prevents an admin from sending a support reply to a self-only conversation", async () => {
   const token = "profile-role-token";
   window.sessionStorage.setItem("wayline.accessToken", token);

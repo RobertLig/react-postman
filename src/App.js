@@ -248,10 +248,14 @@ function App() {
   const [activeConversation, setActiveConversation] = useState(null);
   const [activeConversationIsSupport, setActiveConversationIsSupport] = useState(false);
   const [messages, setMessages] = useState([]);
+  const [messagesConversationId, setMessagesConversationId] = useState(null);
   const [messagesHasMore, setMessagesHasMore] = useState(false);
   const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
   const [messagesError, setMessagesError] = useState("");
   const activeConversationId = activeConversation?.id;
+  const activeConversationIdRef = useRef(activeConversationId);
+  activeConversationIdRef.current = activeConversationId;
+  const messagesConversationIdRef = useRef(null);
   const [supportDraft, setSupportDraft] = useState("");
   const [supportError, setSupportError] = useState("");
   const [sendingSupport, setSendingSupport] = useState(false);
@@ -536,8 +540,13 @@ function App() {
           `/conversations/${conversation.id}/messages?limit=50${beforeQuery}`,
           { token },
         );
+        const conversationId = String(conversation.id);
+        if (String(activeConversationIdRef.current) !== conversationId) return;
         const ordered = [...(result.messages || [])].sort((left, right) => new Date(left.createdAt) - new Date(right.createdAt));
-        setMessages((current) => before ? [...ordered, ...current] : ordered);
+        const append = Boolean(before) && messagesConversationIdRef.current === conversationId;
+        messagesConversationIdRef.current = conversationId;
+        setMessagesConversationId(conversationId);
+        setMessages((current) => append ? [...ordered, ...current] : ordered);
         setMessagesHasMore(Boolean(result.hasMore));
       } catch (error) {
         setMessagesError(getErrorMessage(error));
@@ -560,10 +569,22 @@ function App() {
     [activeConversationId, loadMessages],
   );
   const setSearchMessages = useCallback((items) => {
+    const conversationId = activeConversationIdRef.current;
+    if (!conversationId) return;
+    messagesConversationIdRef.current = String(conversationId);
+    setMessagesConversationId(String(conversationId));
     setMessages([...items].sort((left, right) => new Date(left.createdAt) - new Date(right.createdAt)));
     setMessagesHasMore(false);
   }, []);
-  const receiveMessage = useCallback((message) => {
+  const receiveMessage = useCallback((conversationId, message) => {
+    if (String(activeConversationIdRef.current) !== String(conversationId)) return;
+    const id = String(conversationId);
+    if (messagesConversationIdRef.current !== id) {
+      messagesConversationIdRef.current = id;
+      setMessagesConversationId(id);
+      setMessages([message]);
+      return;
+    }
     setMessages((current) => {
       if (current.some((item) => String(item.id) === String(message.id))) return current;
       return [...current, message].sort((left, right) => new Date(left.createdAt) - new Date(right.createdAt));
@@ -664,6 +685,8 @@ function App() {
       setConversations([]);
       setSupportConversations([]);
       setMessages([]);
+      setMessagesConversationId(null);
+      messagesConversationIdRef.current = null;
       setPage("explore");
     }
   };
@@ -684,6 +707,8 @@ function App() {
       setConversations([]);
       setSupportConversations([]);
       setMessages([]);
+      setMessagesConversationId(null);
+      messagesConversationIdRef.current = null;
       setPage("explore");
       setSelectedAnnouncement(null);
       setAnnouncements([]);
@@ -1083,7 +1108,7 @@ function App() {
                 }
               }}><div className="support-request-icon"><Icon name="message" size={21} /></div><h2>How can we help?</h2><p>Send a note to our support team. We’ll reply in this inbox.</p><textarea value={supportDraft} maxLength="2000" onChange={(event) => setSupportDraft(event.target.value)} placeholder="Tell us what’s on your mind..." required /><button className="dialog-primary" disabled={sendingSupport || !supportDraft.trim()}>{sendingSupport ? "Sending..." : "Send to support"}<Icon name="arrow" size={16} /></button>{supportError && <p className="form-error" role="alert">{supportError}</p>}</form> : activeConversation ? <ConversationPanel
                 conversation={activeConversation}
-                messages={messages}
+                messages={String(messagesConversationId) === String(activeConversationId) ? messages : []}
                 error={messagesError}
                 token={token}
                 user={user}
@@ -1101,7 +1126,7 @@ function App() {
                 }}
                 onUnreadCount={updateUnreadCount}
                 onPresence={updatePresence}
-                onIncomingMessage={(message) => receiveMessage({
+                onIncomingMessage={(message) => receiveMessage(message.conversationId, {
                   ...message,
                   createdAt: new Date(message.createdAt),
                   reactions: [],
@@ -2192,6 +2217,7 @@ function ConversationPanel({
           if (payload.event === "READ" && String(payload.userId) === String(user?.id)) socketCallbacks.current.onUnreadCount(conversation.id, 0);
           if (payload.event === "MESSAGE") {
             socketCallbacks.current.onIncomingMessage({
+              conversationId: conversation.id,
               id: payload.id,
               senderId: payload.senderId,
               content: payload.content,
@@ -2214,6 +2240,10 @@ function ConversationPanel({
       if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) socket.close();
     };
   }, [conversation?.id, token, user?.id]);
+
+  useEffect(() => {
+    lastReadId.current = null;
+  }, [conversation.id]);
 
   useEffect(() => {
     const latestIncoming = [...messages]
