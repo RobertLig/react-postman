@@ -581,36 +581,42 @@ function App() {
     setConversations(updateUnread);
     setSupportConversations(updateUnread);
   }, [activeConversationId, inboxMode, page]);
-  const notificationConversationId = conversations[0]?.id;
+  const notificationConversationKey = JSON.stringify(conversations.map(({ id }) => id));
   useEffect(() => {
-    if (!token || !notificationConversationId) return undefined;
+    const conversationIds = JSON.parse(notificationConversationKey);
+    if (!token || !conversationIds.length) return undefined;
     let active = true;
-    let socket;
+    const sockets = [];
     const connectTimer = window.setTimeout(() => {
       if (!active) return;
-      try {
-        socket = new WebSocket(getWebSocketUrl(`/ws/chat/${notificationConversationId}?token=${encodeURIComponent(token)}`));
-        socket.onmessage = (event) => {
-          let payload;
-          try {
-            payload = JSON.parse(event.data);
-          } catch {
-            return;
-          }
-          if (payload.event === "UNREAD_COUNT_UPDATE") {
-            updateUnreadCount(payload.conversationId, payload.unreadCount);
-          }
-        };
-      } catch (failure) {
-        setNotice(getErrorMessage(failure));
-      }
+      conversationIds.forEach((conversationId) => {
+        try {
+          const socket = new WebSocket(getWebSocketUrl(`/ws/chat/${conversationId}?token=${encodeURIComponent(token)}`));
+          sockets.push(socket);
+          socket.onmessage = (event) => {
+            let payload;
+            try {
+              payload = JSON.parse(event.data);
+            } catch {
+              return;
+            }
+            if (payload.event === "UNREAD_COUNT_UPDATE") {
+              updateUnreadCount(payload.conversationId, payload.unreadCount);
+            }
+          };
+        } catch (failure) {
+          setNotice(getErrorMessage(failure));
+        }
+      });
     }, 0);
     return () => {
       active = false;
       window.clearTimeout(connectTimer);
-      if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) socket.close();
+      sockets.forEach((socket) => {
+        if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) socket.close();
+      });
     };
-  }, [notificationConversationId, token, updateUnreadCount]);
+  }, [notificationConversationKey, token, updateUnreadCount]);
   const updatePresence = useCallback((userId, online) => {
     const updateConversationPresence = (current) => current.map((item) => {
       const other = item.participants?.find((person) => String(person.id) !== String(user?.id));

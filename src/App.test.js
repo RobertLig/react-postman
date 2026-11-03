@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import L from "leaflet";
 import App from "./App";
@@ -38,6 +38,58 @@ test("renders and loads route listings", async () => {
     expect.stringContaining("/announcements?page=0&size=12"),
     expect.objectContaining({ method: "GET" }),
   ));
+});
+
+test("shows the Messages nav dot for an unread update in any conversation", async () => {
+  const token = "messages-notification-token";
+  const originalWebSocket = window.WebSocket;
+  const sockets = [];
+  window.sessionStorage.setItem("wayline.accessToken", token);
+  window.WebSocket = class MockWebSocket {
+    static OPEN = 1;
+    static CONNECTING = 0;
+
+    constructor(url) {
+      this.url = url;
+      this.readyState = MockWebSocket.CONNECTING;
+      sockets.push(this);
+    }
+
+    close() {
+      this.readyState = 3;
+    }
+  };
+  window.fetch.mockImplementation(async (input) => {
+    const path = new URL(String(input)).pathname;
+    const result = path === "/users/me"
+      ? { id: 7, name: "Regular User" }
+      : path === "/conversations/list"
+        ? [{ id: 10, unreadCount: 0 }, { id: 20, unreadCount: 0 }]
+        : { items: [], totalItems: 0 };
+    return { ok: true, text: async () => JSON.stringify(result) };
+  });
+
+  let unmount = () => {};
+  try {
+    ({ unmount } = render(<App />));
+    await waitFor(() => expect(sockets).toHaveLength(2));
+    expect(sockets.map((socket) => new URL(socket.url).pathname)).toEqual([
+      "/ws/chat/10",
+      "/ws/chat/20",
+    ]);
+
+    act(() => {
+      sockets[1].onmessage({
+        data: JSON.stringify({ event: "UNREAD_COUNT_UPDATE", conversationId: 20, unreadCount: 1 }),
+      });
+    });
+
+    const messagesNavButton = await screen.findByRole("button", { name: /^Messages/ });
+    expect(messagesNavButton.querySelector(".unread-dot")).toBeInTheDocument();
+  } finally {
+    unmount();
+    window.WebSocket = originalWebSocket;
+  }
 });
 
 test("prevents an admin from sending a support reply to a self-only conversation", async () => {
