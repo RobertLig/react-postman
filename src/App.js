@@ -1085,7 +1085,8 @@ function App() {
                     body: { blockedId },
                   });
                   setNotice(isBlocked ? "This member has been unblocked." : "This member has been blocked.");
-                  await loadConversations();
+                  if (activeConversationIsSupport) await loadSupportConversations();
+                  else await loadConversations();
                 }}
                 onUnreadCount={updateUnreadCount}
                 onPresence={updatePresence}
@@ -2143,6 +2144,7 @@ function ConversationPanel({
   const other = getOtherParticipant(conversation, user);
   const hasOtherParticipant = !Array.isArray(conversation.participants)
     || Boolean(other);
+  useEffect(() => setBlocked(false), [conversation.id]);
   socketCallbacks.current = { onPresence, onUnreadCount, onRefreshMessages, onIncomingMessage };
   const sendTypingEvent = (type) => apiRequest("/typing", {
     method: "POST",
@@ -2297,7 +2299,7 @@ function ConversationPanel({
   };
 
   return <div className="chat-panel">
-    <div className="chat-header"><span className="avatar">{other?.photoUrl ? <img src={other.photoUrl} alt="" /> : (other?.name || "U").slice(0, 1).toUpperCase()}</span><div><b>{isSupport && role === "ADMIN" ? other?.name || "Member" : isSupport ? "Wayline Support" : other?.name || "Wayline member"}</b><small>{connection === "connected" ? "Live connection" : conversation.otherUserOnline ? "Online now" : "A Wayline conversation"}</small></div>{!isSupport && <form className="chat-search" onSubmit={startSearch}><input aria-label="Search this conversation" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" /><button aria-label="Search messages"><Icon name="search" size={15} /></button>{search && <button type="button" aria-label="Clear search" onClick={() => { setSearch(""); setSearchError(""); onSearchReset(); }}><Icon name="close" size={13} /></button>}</form>}<span className="chat-header-badge"><Icon name="check" size={14} />{connection === "connected" ? "Live chat" : "Private chat"}</span>{!isSupport && other?.id && <button className="block-user-button" onClick={async () => {
+    <div className="chat-header"><span className="avatar">{other?.photoUrl ? <img src={other.photoUrl} alt="" /> : (other?.name || "U").slice(0, 1).toUpperCase()}</span><div><b>{isSupport && role === "ADMIN" ? other?.name || "Member" : isSupport ? "Wayline Support" : other?.name || "Wayline member"}</b><small>{connection === "connected" ? "Live connection" : conversation.otherUserOnline ? "Online now" : "A Wayline conversation"}</small></div>{!isSupport && <form className="chat-search" onSubmit={startSearch}><input aria-label="Search this conversation" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" /><button aria-label="Search messages"><Icon name="search" size={15} /></button>{search && <button type="button" aria-label="Clear search" onClick={() => { setSearch(""); setSearchError(""); onSearchReset(); }}><Icon name="close" size={13} /></button>}</form>}<span className="chat-header-badge"><Icon name="check" size={14} />{connection === "connected" ? "Live chat" : "Private chat"}</span>{other?.id && <button className="block-user-button" onClick={async () => {
       if (!window.confirm(`Block ${other.name || "this member"}? They will no longer be able to message you.`)) return;
       try {
         await onBlock(other.id, blocked);

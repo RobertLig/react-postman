@@ -67,6 +67,60 @@ test("prevents an admin from sending a support reply to a self-only conversation
   expect(window.fetch.mock.calls.some(([url]) => String(url).includes("/messages/support/reply"))).toBe(false);
 });
 
+test.each([
+  {
+    role: "USER",
+    currentUser: { id: 7, name: "Regular User", role: "USER" },
+    otherUser: { id: 88, name: "Support Agent" },
+    inboxButton: "Support",
+    conversationButton: /Wayline Support.*Support conversation/,
+    blockedId: 88,
+  },
+  {
+    role: "ADMIN",
+    currentUser: { id: 42, name: "Admin User", role: "ADMIN" },
+    otherUser: { id: 7, name: "Member" },
+    inboxButton: "Support queue",
+    conversationButton: /Member.*Support conversation/,
+    blockedId: 7,
+  },
+])("allows $role users to block a participant in support conversations", async ({
+  currentUser,
+  otherUser,
+  inboxButton,
+  conversationButton,
+  blockedId,
+}) => {
+  const token = "support-block-token";
+  window.sessionStorage.setItem("wayline.accessToken", token);
+  window.confirm = jest.fn(() => true);
+  window.fetch.mockImplementation(async (input) => {
+    const path = new URL(String(input)).pathname;
+    const result = path === "/users/me"
+      ? currentUser
+      : path === "/conversations/support"
+        ? [{ id: 90, participants: [currentUser, otherUser] }]
+        : path === "/conversations/90/messages"
+          ? { messages: [], hasMore: false }
+          : { items: [], totalItems: 0 };
+    return { ok: true, text: async () => JSON.stringify(result) };
+  });
+
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: /^Messages/ }));
+  fireEvent.click(await screen.findByRole("button", { name: inboxButton }));
+  fireEvent.click(await screen.findByRole("button", { name: conversationButton }));
+  fireEvent.click(await screen.findByRole("button", { name: "Block" }));
+
+  await waitFor(() => {
+    const blockRequest = window.fetch.mock.calls.find(([url]) => new URL(String(url)).pathname === "/block");
+    expect(blockRequest).toBeDefined();
+    expect(blockRequest[1].method).toBe("POST");
+    expect(JSON.parse(blockRequest[1].body)).toEqual({ blockedId });
+  });
+  expect(await screen.findByRole("button", { name: "Unblock" })).toBeInTheDocument();
+});
+
 test("sends the advanced announcement filters in the backend search format", async () => {
   Object.defineProperty(window.navigator, "language", { configurable: true, value: "pl-PL" });
   render(<App />);
