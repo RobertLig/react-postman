@@ -21,6 +21,7 @@ import {
   formatStoredWeight,
   getMeasurementSystem,
 } from "./measurement";
+import { getLocale, LocalizedText, translate } from "./i18n";
 
 const GOOGLE_CLIENT_ID =
   process.env.REACT_APP_GOOGLE_CLIENT_ID ||
@@ -103,7 +104,7 @@ function formatDate(value, options = { month: "short", day: "numeric" }) {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? "Date flexible"
-    : new Intl.DateTimeFormat(undefined, options).format(date);
+    : new Intl.DateTimeFormat(getLocale(), options).format(date);
 }
 
 function announcementTitle(announcement) {
@@ -193,6 +194,13 @@ function isAllowedAttachmentType(type) {
 }
 
 function App() {
+  useEffect(() => {
+    document.documentElement.lang = getLocale();
+    document.title = getLocale() === "pl"
+      ? "Wayline — dostawy przesyłek z podróżnymi"
+      : "Wayline — parcel delivery by travelers";
+  }, []);
+
   const [token, setToken] = useState(getStoredToken);
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(() => getTokenRole(getStoredToken()));
@@ -786,7 +794,8 @@ function App() {
   };
 
   return (
-    <div className="app-shell">
+    <LocalizedText>
+      <div className="app-shell">
       <header className="topbar">
         <a
           className="brand"
@@ -810,7 +819,9 @@ function App() {
               <button className="post-button" onClick={() => setPage("post")}><Icon name="plus" size={17} /> Post an ad</button>
               <button className="profile-button" onClick={() => setPage("profile")} title="Profile settings">
                 <span className="avatar">{user.photoUrl ? <img src={user.photoUrl} alt="" /> : (user.name || user.email || "Y").slice(0, 1).toUpperCase()}</span>
-                <span className="profile-name">{user.name || "Account"}</span>
+                <span className="profile-name">{user.name
+                  ? <span data-no-translate>{user.name}</span>
+                  : "Account"}</span>
                 <Icon name="user" size={17} />
               </button>
             </>
@@ -1082,7 +1093,11 @@ function App() {
                     if (inboxMode === "messages") updateUnreadCount(conversation.id, 0);
                   }}>
                   <span className="avatar conversation-avatar">{other?.photoUrl ? <img src={other.photoUrl} alt="" /> : (other?.name || (inboxMode === "support" && role === "ADMIN" ? "Member" : "Support")).slice(0, 1).toUpperCase()}</span>
-                  <span className="conversation-meta"><b>{inboxMode === "support" && role !== "ADMIN" ? "Wayline Support" : other?.name || (inboxMode === "support" && role === "ADMIN" ? "Member" : "Wayline member")}</b><small>{conversation.otherUserOnline ? "Online now" : inboxMode === "support" ? "Support conversation" : "Open conversation"}</small></span>
+                  <span className="conversation-meta"><b>{inboxMode === "support" && role !== "ADMIN"
+                    ? "Wayline Support"
+                    : other?.name
+                      ? <span data-no-translate>{other.name}</span>
+                      : inboxMode === "support" && role === "ADMIN" ? "Member" : "Wayline member"}</b><small>{conversation.otherUserOnline ? "Online now" : inboxMode === "support" ? "Support conversation" : "Open conversation"}</small></span>
                   {conversation.unreadCount > 0 && <span className="unread-count">{conversation.unreadCount}</span>}
                   </button>
                   <button className="conversation-dismiss" title="Hide conversation" onClick={() => handleConversationVisibility({ conversation, isSupport: inboxMode === "support" })} aria-label={`Hide conversation with ${other?.name || "member"}`}>×</button>
@@ -1203,7 +1218,8 @@ function App() {
         user={user}
       />}
       {authOpen && <AuthDialog initialMode={authMode} resetToken={resetToken} onClose={() => setAuthOpen(false)} onAuthenticated={handleAuth} onNotice={setNotice} />}
-    </div>
+      </div>
+    </LocalizedText>
   );
 }
 
@@ -1212,22 +1228,26 @@ function AnnouncementCard({ announcement, index, onOpen }) {
   const routeClass = needsCourier ? "sender" : "courier";
   const title = announcementTitle(announcement);
   return (
+    <LocalizedText>
     <article className={`route-card card-${index % 3}`}>
       <button className="card-open" onClick={onOpen} aria-label={`View ${title}`} />
       <div className={`route-card-art ${routeClass}`}>
         <span className="route-category"><span />{needsCourier ? "Parcel needs a courier" : "Can deliver a parcel"}</span>
         <span className="route-art-symbol"><Icon name={needsCourier ? "box" : "route"} size={28} /></span>
-        <div className="route-city route-city-start"><span className="route-city-name" title={announcement.postingPlace || "Starting point"}>{announcement.postingPlace || "Starting point"}</span><span className="route-city-marker" /></div>
+        <div className="route-city route-city-start"><span className="route-city-name" data-no-translate title={announcement.postingPlace || translate("Starting point")}>{announcement.postingPlace || translate("Starting point")}</span><span className="route-city-marker" /></div>
         <div className="route-dotted" />
-        <div className="route-city route-city-end"><span className="route-city-name" title={announcement.receptionPlace || "Destination"}>{announcement.receptionPlace || "Destination"}</span><span className="route-city-marker" /></div>
+        <div className="route-city route-city-end"><span className="route-city-name" data-no-translate title={announcement.receptionPlace || translate("Destination")}>{announcement.receptionPlace || translate("Destination")}</span><span className="route-city-marker" /></div>
       </div>
       <div className="route-card-content">
         <div className="route-card-meta"><span><Icon name="calendar" size={15} />{formatDate(announcement.postingDateTime)}</span><span><Icon name="pin" size={15} />{announcement.stops?.length || 0} stops</span></div>
-        <h3>{title}</h3>
-        <p>{announcementDescription(announcement) || `${needsCourier ? "Looking for a traveler to deliver this parcel." : "Offering to carry a parcel along this route."}`}</p>
+        <h3 data-no-translate>{title}</h3>
+        <p>{announcementDescription(announcement)
+          ? <span data-no-translate>{announcementDescription(announcement)}</span>
+          : translate(needsCourier ? "Looking for a traveler to deliver this parcel." : "Offering to carry a parcel along this route.")}</p>
         <div className="route-card-bottom"><span className="avatar avatar-small">W</span><span className="poster-caption">Wayline member</span><button className="card-arrow" onClick={onOpen} aria-label="See route details"><Icon name="arrow" size={17} /></button></div>
       </div>
     </article>
+    </LocalizedText>
   );
 }
 
@@ -1335,7 +1355,7 @@ function ProfilePage({ token, user, onSave, onSignOut, onDeleteAccount, onRequir
   };
 
   const deleteAccount = async () => {
-    if (!window.confirm("Permanently delete your account, routes, and account data? This cannot be undone.")) return;
+    if (!window.confirm(translate("Permanently delete your account, routes, and account data? This cannot be undone."))) return;
     setDeleteBusy(true);
     setError("");
     try {
@@ -1346,10 +1366,10 @@ function ProfilePage({ token, user, onSave, onSignOut, onDeleteAccount, onRequir
     }
   };
 
-  return <main className="profile-page">
+  return <LocalizedText><main className="profile-page">
     <div className="post-intro"><div className="eyebrow section-eyebrow">YOUR ACCOUNT</div><h1>Profile settings</h1><p>Keep your details up to date so your next connection starts smoothly.</p></div>
     <div className="profile-card">
-      <div className="profile-identity"><span className="profile-large-avatar">{user.photoUrl ? <img src={user.photoUrl} alt="Your profile" /> : (user.name || user.email || "Y").slice(0, 1).toUpperCase()}</span><div><h2>{user.name || "Wayline member"}</h2><p>{user.email}</p><div className="avatar-actions">{!user.photoUrl && <label className="avatar-upload">{avatarBusy ? "Working..." : "Add a photo"}<input type="file" accept="image/jpeg,image/png" disabled={avatarBusy} onChange={(event) => { uploadAvatar(event.target.files?.[0]); event.target.value = ""; }} /></label>}{user.photoUrl && <button type="button" className="avatar-remove" disabled={avatarBusy} onClick={removeAvatar}>{avatarBusy ? "Working..." : "Remove photo"}</button>}</div></div></div>
+      <div className="profile-identity"><span className="profile-large-avatar">{user.photoUrl ? <img src={user.photoUrl} alt="Your profile" /> : (user.name || user.email || "Y").slice(0, 1).toUpperCase()}</span><div><h2>{user.name ? <span data-no-translate>{user.name}</span> : "Wayline member"}</h2><p data-no-translate>{user.email}</p><div className="avatar-actions">{!user.photoUrl && <label className="avatar-upload">{avatarBusy ? "Working..." : "Add a photo"}<input type="file" accept="image/jpeg,image/png" disabled={avatarBusy} onChange={(event) => { uploadAvatar(event.target.files?.[0]); event.target.value = ""; }} /></label>}{user.photoUrl && <button type="button" className="avatar-remove" disabled={avatarBusy} onClick={removeAvatar}>{avatarBusy ? "Working..." : "Remove photo"}</button>}</div></div></div>
       <form className="profile-form" onSubmit={submit}>
         <label>Full name<input required value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" /></label>
         <label>Email address<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" /></label>
@@ -1384,6 +1404,8 @@ function ProfilePage({ token, user, onSave, onSignOut, onDeleteAccount, onRequir
             onChange={handlePhoneChange}
             onMount={handlePhoneMount}
             enableSearch
+            searchPlaceholder={getLocale() === "pl" ? "Szukaj" : "Search"}
+            searchNotFound={getLocale() === "pl" ? "Nie znaleziono kraju" : "No country found"}
             countryCodeEditable={false}
             specialLabel=""
             inputProps={{ id: "profile-phone", name: "phone", autoComplete: "tel" }}
@@ -1399,7 +1421,7 @@ function ProfilePage({ token, user, onSave, onSignOut, onDeleteAccount, onRequir
         <div className="delete-account"><div><b>Delete account</b><span>Permanently remove your account and route listings.</span></div><button type="button" disabled={deleteBusy} onClick={deleteAccount}>{deleteBusy ? "Deleting..." : "Delete account"}</button></div>
       </form>
     </div>
-  </main>;
+  </main></LocalizedText>;
 }
 
 function AnnouncementDialog({ announcement, token, onClose, onContact, onChange, onDelete, user }) {
@@ -1554,7 +1576,7 @@ function AnnouncementDialog({ announcement, token, onClose, onContact, onChange,
     }
   };
   const deleteAnnouncement = async () => {
-    if (!window.confirm("Remove this route and its photos? This cannot be undone.")) return;
+    if (!window.confirm(translate("Remove this route and its photos? This cannot be undone."))) return;
     setPhotoBusy(true);
     setPhotoError("");
     try {
@@ -1642,6 +1664,7 @@ function AnnouncementDialog({ announcement, token, onClose, onContact, onChange,
       ? "Destination city"
       : `Stop ${editForm.stops.findIndex((stop) => stop.key === activeLocationKey) + 1}`;
   return (
+    <LocalizedText>
     <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className={`detail-dialog${editing ? " route-editing" : ""}`} role="dialog" aria-modal="true" aria-labelledby="detail-title">
         <button className="modal-close" onClick={onClose} aria-label="Close route details"><Icon name="close" size={20} /></button>
@@ -1683,11 +1706,11 @@ function AnnouncementDialog({ announcement, token, onClose, onContact, onChange,
               )} />
             </div>
             <div className="route-edit-actions"><button className="outline-button" type="button" onClick={() => { setEditing(false); setPhotoError(""); setMapError(""); }}>Cancel</button><button className="dialog-primary" disabled={photoBusy}>{photoBusy ? "Saving..." : "Save route"}<Icon name="check" size={15} /></button></div>
-          </form> : <h2 id="detail-title">{announcementTitle(announcement)}</h2>}
+          </form> : <h2 id="detail-title" data-no-translate>{announcementTitle(announcement)}</h2>}
           {photos.length > 0 && <div className="photo-gallery">{photos.map((photo, index) => <div className="detail-photo" key={photo.id}><img src={photo.url} alt={`Route ${index + 1}`} />{String(user?.id) === String(announcement.userId) && <div className="photo-actions">{photo.position === 0 ? <span>Cover photo</span> : <button disabled={photoBusy} onClick={() => setMainPhoto(photo)}>Make cover</button>}<button disabled={photoBusy || index === 0} title="Move photo earlier" onClick={() => movePhoto(index, -1)} aria-label="Move photo earlier">↑</button><button disabled={photoBusy || index === photos.length - 1} title="Move photo later" onClick={() => movePhoto(index, 1)} aria-label="Move photo later">↓</button><button disabled={photoBusy} onClick={() => removePhoto(photo)} aria-label="Remove photo"><Icon name="close" size={14} /></button></div>}</div>)}</div>}
           {needsCourier && String(user?.id) === String(announcement.userId) && photos.length < 3 && <label className="add-photo-control"><Icon name="plus" size={15} />{photoBusy ? "Uploading..." : "Add parcel photos"}<input type="file" accept="image/jpeg,image/png" disabled={photoBusy} onChange={(event) => { addPhoto(event.target.files?.[0]); event.target.value = ""; }} /></label>}
           {photoError && <div className="form-error" role="alert">{photoError}</div>}
-          {!editing && <div className="detail-route"><span className="route-point start" /><div><b title={announcement.postingPlace}>{announcement.postingPlace}</b><small>Starting point</small></div><span className="detail-route-line" /><span className="route-point end" /><div><b title={announcement.receptionPlace}>{announcement.receptionPlace}</b><small>Destination</small></div></div>}
+          {!editing && <div className="detail-route"><span className="route-point start" /><div><b data-no-translate title={announcement.postingPlace}>{announcement.postingPlace}</b><small>Starting point</small></div><span className="detail-route-line" /><span className="route-point end" /><div><b data-no-translate title={announcement.receptionPlace}>{announcement.receptionPlace}</b><small>Destination</small></div></div>}
           {!editing && hasCoordinates(announcement.postingLatitude, announcement.postingLongitude)
             && hasCoordinates(announcement.receptionLatitude, announcement.receptionLongitude)
             && <div className="detail-map-section">
@@ -1716,7 +1739,7 @@ function AnnouncementDialog({ announcement, token, onClose, onContact, onChange,
             <ol>{sortStopsByPosition(announcement.stops)
               .map(({ stop }, index) => <li key={stop.id || `${stop.position}-${stop.address}`}><span>{index + 1}</span>{stop.address}</li>)}</ol>
           </div>}
-          {!editing && announcementDescription(announcement) && <p className="detail-description">{announcementDescription(announcement)}</p>}
+          {!editing && announcementDescription(announcement) && <p className="detail-description" data-no-translate>{announcementDescription(announcement)}</p>}
           {!editing && (announcement.weight?.value > 0 || announcement.dimensions?.width > 0) && <div className="detail-facts">
             {announcement.weight?.value > 0 && <span><Icon name="box" size={16} />Up to {formatStoredWeight(announcement.weight.value)}</span>}
             {announcement.dimensions?.width > 0 && <span><Icon name="box" size={16} />{formatStoredDimensions(announcement.dimensions)}</span>}
@@ -1726,6 +1749,7 @@ function AnnouncementDialog({ announcement, token, onClose, onContact, onChange,
         </div>
       </section>
     </div>
+    </LocalizedText>
   );
 }
 
@@ -1837,6 +1861,7 @@ function AuthDialog({ initialMode, resetToken, onClose, onAuthenticated, onNotic
     }
   };
   return (
+    <LocalizedText>
     <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title">
         <button className="modal-close" onClick={onClose} aria-label="Close sign in"><Icon name="close" size={20} /></button>
@@ -1858,6 +1883,7 @@ function AuthDialog({ initialMode, resetToken, onClose, onAuthenticated, onNotic
         {(mode === "reset-request" || mode === "reset-confirm") && <button className="forgot-password back-to-login" onClick={() => { setMode("login"); setError(""); }}>Back to log in</button>}
       </section>
     </div>
+    </LocalizedText>
   );
 }
 
@@ -1885,7 +1911,7 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
     photoPreviewUrls.current.forEach((url) => URL.revokeObjectURL(url));
   }, []);
 
-  if (!token || !user) return <main className="post-page"><div className="post-auth"><span className="empty-icon"><Icon name="user" size={25} /></span><h1>Every delivery starts somewhere.</h1><p>Sign in or create an account to post an ad or offer to carry a parcel.</p><button className="dialog-primary" onClick={onRequireAuth}>Continue to sign in <Icon name="arrow" size={17} /></button></div></main>;
+  if (!token || !user) return <LocalizedText><main className="post-page"><div className="post-auth"><span className="empty-icon"><Icon name="user" size={25} /></span><h1>Every delivery starts somewhere.</h1><p>Sign in or create an account to post an ad or offer to carry a parcel.</p><button className="dialog-primary" onClick={onRequireAuth}>Continue to sign in <Icon name="arrow" size={17} /></button></div></main></LocalizedText>;
 
   const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const updateLocation = (field, key, value, location, preserveMapRequest = false) => {
@@ -2030,6 +2056,7 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
       : `Stop ${stops.findIndex((stop) => stop.id === activeLocationKey) + 1}`;
 
   return (
+    <LocalizedText>
     <main className="post-page">
       <div className="post-intro"><div className="eyebrow section-eyebrow">PARCELS, ON THEIR WAY</div><h1>Post a delivery ad.</h1><p>Offer to carry a parcel on a trip you’re taking, or find someone to deliver something for you.</p></div>
       <form className="post-form" onSubmit={submit}>
@@ -2137,6 +2164,7 @@ function PostRoute({ token, user, onRequireAuth, onPosted }) {
         <div className="post-submit"><span><Icon name="check" size={16} />Your contact details stay private.</span><button className="dialog-primary" disabled={busy}>{busy ? "Publishing..." : "Publish ad"}<Icon name="arrow" size={17} /></button></div>
       </form>
     </main>
+    </LocalizedText>
   );
 }
 
@@ -2339,9 +2367,9 @@ function ConversationPanel({
     }
   };
 
-  return <div className="chat-panel">
-    <div className="chat-header"><span className="avatar">{other?.photoUrl ? <img src={other.photoUrl} alt="" /> : (other?.name || "U").slice(0, 1).toUpperCase()}</span><div><b>{isSupport && role === "ADMIN" ? other?.name || "Member" : isSupport ? "Wayline Support" : other?.name || "Wayline member"}</b><small>{connection === "connected" ? "Live connection" : conversation.otherUserOnline ? "Online now" : "A Wayline conversation"}</small></div><form className="chat-search" onSubmit={startSearch}><input aria-label="Search this conversation" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" /><button aria-label="Search messages"><Icon name="search" size={15} /></button>{search && <button type="button" aria-label="Clear search" onClick={() => { setSearch(""); setSearchError(""); onSearchReset(); }}><Icon name="close" size={13} /></button>}</form><span className="chat-header-badge"><Icon name="check" size={14} />{connection === "connected" ? "Live chat" : "Private chat"}</span>{other?.id && <button className="block-user-button" onClick={async () => {
-      if (!window.confirm(`Block ${other.name || "this member"}? They will no longer be able to message you.`)) return;
+  return <LocalizedText><div className="chat-panel">
+    <div className="chat-header"><span className="avatar">{other?.photoUrl ? <img src={other.photoUrl} alt="" /> : (other?.name || "U").slice(0, 1).toUpperCase()}</span><div><b>{isSupport && role === "ADMIN" ? (other?.name ? <span data-no-translate>{other.name}</span> : "Member") : isSupport ? "Wayline Support" : other?.name ? <span data-no-translate>{other.name}</span> : "Wayline member"}</b><small>{connection === "connected" ? "Live connection" : conversation.otherUserOnline ? "Online now" : "A Wayline conversation"}</small></div><form className="chat-search" onSubmit={startSearch}><input aria-label="Search this conversation" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" /><button aria-label="Search messages"><Icon name="search" size={15} /></button>{search && <button type="button" aria-label="Clear search" onClick={() => { setSearch(""); setSearchError(""); onSearchReset(); }}><Icon name="close" size={13} /></button>}</form><span className="chat-header-badge"><Icon name="check" size={14} />{connection === "connected" ? "Live chat" : "Private chat"}</span>{other?.id && <button className="block-user-button" onClick={async () => {
+      if (!window.confirm(translate(`Block ${other.name || "this member"}? They will no longer be able to message you.`))) return;
       try {
         await onBlock(other.id, blocked);
         setBlocked((current) => !current);
@@ -2358,10 +2386,10 @@ function ConversationPanel({
         const mine = String(message.senderId) === String(user?.id);
         const myReaction = message.reactions?.find((reaction) => String(reaction.userId) === String(user?.id))?.reaction;
         return <div key={message.id} className={`chat-message ${mine ? "mine" : ""}`}>
-          <p>{message.content}</p>
-          {message.attachments?.length > 0 && <div className="message-attachments">{message.attachments.map((attachment) => attachment.type?.startsWith("image/") ? <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer"><img src={attachment.url} alt="Shared attachment" /></a> : <a className="attachment-link" key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer"><Icon name="box" size={15} />{attachment.type?.split("/").pop() || "Download file"} · {(attachment.size / 1024).toFixed(0)} KB</a>)}</div>}
+          <p data-no-translate>{message.content}</p>
+          {message.attachments?.length > 0 && <div className="message-attachments">{message.attachments.map((attachment) => attachment.type?.startsWith("image/") ? <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer"><img src={attachment.url} alt="Shared attachment" /></a> : <a className="attachment-link" key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer"><Icon name="box" size={15} />{attachment.type?.split("/").pop() ? <span data-no-translate>{attachment.type.split("/").pop()}</span> : "Download file"} · {(attachment.size / 1024).toFixed(0)} KB</a>)}</div>}
           <div className="message-meta"><time>{formatDate(message.createdAt, { hour: "numeric", minute: "2-digit" })}</time><button title={mine ? "Delete message for everyone" : "Hide message for yourself"} onClick={async () => {
-            if (!window.confirm(mine ? "Delete this message for everyone?" : "Hide this message for yourself?")) return;
+            if (!window.confirm(translate(mine ? "Delete this message for everyone?" : "Hide this message for yourself?"))) return;
             try { await onDeleteMessage(message.id); } catch (failure) { setSendError(getErrorMessage(failure)); }
           }}>Delete</button></div>
           <div className="reaction-bar">{["👍", "❤️", "😂", "🙏"].map((reaction) => <button key={reaction} className={myReaction === reaction ? "reacted" : ""} title={`React ${reaction}`} onClick={async () => {
@@ -2369,12 +2397,12 @@ function ConversationPanel({
           }}>{reaction}<span>{message.reactions?.filter((item) => item.reaction === reaction).length || ""}</span></button>)}</div>
         </div>;
       })}
-      {typing && <div className="typing-indicator"><i /><i /><i />{other?.name || "They"} is typing</div>}
+      {typing && <div className="typing-indicator"><i /><i /><i />{other?.name ? <span data-no-translate>{other.name}</span> : "They"} is typing</div>}
       {!messages.length && !error && <div className="chat-welcome"><Icon name="message" size={23} /><p>Say hello and start planning your journey together.</p></div>}
     </div>
     <form className="chat-compose" onSubmit={submit}><input ref={attachmentInput} type="file" multiple hidden onChange={uploadAttachments} /><button type="button" className="attach-button" aria-label="Attach files" title="Attach files (max 5 MB each)" disabled={sending || blocked || !hasOtherParticipant} onClick={() => attachmentInput.current?.click()}><Icon name="plus" size={19} /></button><input aria-label="Write a message" value={content} maxLength="2000" disabled={blocked || !hasOtherParticipant} onChange={(event) => handleTyping(event.target.value)} placeholder={!hasOtherParticipant ? "No other participant in this conversation." : blocked ? "This conversation is blocked." : "Write a message..."} /><button disabled={!content.trim() || sending || blocked || !hasOtherParticipant} aria-label="Send message"><Icon name="arrow" size={19} /></button></form>
     {(!hasOtherParticipant || sendError || !token || connection === "unavailable") && <p className="chat-error" role={!hasOtherParticipant ? "alert" : undefined}>{!hasOtherParticipant ? "This conversation has no other participant, so you can’t send a message to yourself." : sendError || (!token ? "Sign in to send messages." : "Live updates are unavailable. Messages can still be sent.")}</p>}
-  </div>;
+  </div></LocalizedText>;
 }
 
 export default App;

@@ -1,3 +1,5 @@
+import { LocalizedText } from "./i18n";
+
 export default function SortableList({
   items,
   onChange,
@@ -16,6 +18,7 @@ export default function SortableList({
   };
 
   return (
+    <LocalizedText>
     <ol className="sortable-list" aria-label={listLabel}>
       {items.map((item, index) => (
         <li className="sortable-item" key={getItemKey(item)}>
@@ -37,5 +40,6 @@ export default function SortableList({
         </li>
       ))}
     </ol>
+    </LocalizedText>
   );
 }

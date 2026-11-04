@@ -27,6 +27,17 @@ REACT_APP_GOOGLE_CLIENT_ID=your-google-web-client-id
 REACT_APP_GEOCODING_URL=https://photon.komoot.io/api/
 ```
 
+## Languages
+
+The interface supports English and Polish. It checks the browser's preferred
+language list in order; `pl` and regional variants select Polish, and English
+is the fallback. Frontend interface text is kept in `src/i18n.js` and ships
+with the frontend, so it works from a static CDN without a translation service.
+Backend validation and exception messages remain in the API's
+`resources/i18n` translations, where they are selected from the request's
+`Accept-Language` header. Keep UI copy in the frontend and API-generated
+messages in the backend.
+
 The Google client ID defaults to the one configured by the development API.
 The API must allow the frontend origin through its CORS configuration. For
 local development, start Quarkus with `./mvnw quarkus:dev` from the API

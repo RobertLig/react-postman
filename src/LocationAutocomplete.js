@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { searchLocations } from "./geocoding";
+import { LocalizedText } from "./i18n";
 
 export default function LocationAutocomplete({
   label,
@@ -82,6 +83,7 @@ export default function LocationAutocomplete({
   };
 
   return (
+    <LocalizedText>
     <div className="location-autocomplete">
       <label htmlFor={inputId}>{label}
         <input
@@ -116,6 +118,7 @@ export default function LocationAutocomplete({
               role="option"
               aria-selected={index === activeIndex}
               className={index === activeIndex ? "active" : ""}
+              data-no-translate
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => chooseSuggestion(location)}
             >
@@ -129,5 +132,6 @@ export default function LocationAutocomplete({
         </div>
       )}
     </div>
+    </LocalizedText>
   );
 }

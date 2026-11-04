@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { LocalizedText } from "./i18n";
 
 function GoogleLogin() {
 
@@ -34,10 +35,12 @@ function GoogleLogin() {
     }, []);
 
     return (
+        <LocalizedText>
         <div>
             <h2>Sign in with Google</h2>
             <div id="googleSignInButton"></div>
         </div>
+        </LocalizedText>
     );
 }
 

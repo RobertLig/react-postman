@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { LocalizedText, translate } from "./i18n";
 
 const INITIAL_VIEW = [25, 0];
 
@@ -134,7 +135,7 @@ export default function LocationMap({ locations, activeKey, onMapPick, readOnly 
 
     mappedLocations.forEach(({ key, label, location }) => {
       const popupContent = document.createElement("span");
-      popupContent.textContent = label;
+      popupContent.textContent = translate(label);
       const marker = L.marker(
         [location.latitude, location.longitude],
         {
@@ -164,9 +165,11 @@ export default function LocationMap({ locations, activeKey, onMapPick, readOnly 
   }, [locations, activeKey, readOnly, showRoute]);
 
   return (
+    <LocalizedText>
     <div className="location-map-wrap">
       <div className={`location-map${readOnly ? " read-only" : ""}`} ref={containerRef} role={readOnly ? "img" : "application"} aria-label={readOnly ? "Route map" : "OpenStreetMap place picker"} />
       {!readOnly && <p className="location-map-help">The line connects your route locations. Click the map to set the active location; its highlighted marker shows which field will be updated.</p>}
     </div>
+    </LocalizedText>
   );
 }

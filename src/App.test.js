@@ -6,9 +6,16 @@ import { getMeasurementSystem } from "./measurement";
 
 afterEach(() => {
   delete window.navigator.language;
+  delete window.navigator.languages;
 });
 
+function setBrowserLocale(locale) {
+  Object.defineProperty(window.navigator, "language", { configurable: true, value: locale });
+  Object.defineProperty(window.navigator, "languages", { configurable: true, value: [locale] });
+}
+
 beforeEach(() => {
+  setBrowserLocale("en-US");
   window.fetch = jest.fn().mockResolvedValue({
     ok: true,
     text: async () => JSON.stringify({
@@ -417,24 +424,26 @@ test.each([
 });
 
 test("sends the advanced announcement filters in the backend search format", async () => {
-  Object.defineProperty(window.navigator, "language", { configurable: true, value: "pl-PL" });
+  setBrowserLocale("pl-PL");
   render(<App />);
 
+  expect(document.documentElement).toHaveAttribute("lang", "pl");
+  expect(document.title).toBe("Wayline — dostawy przesyłek z podróżnymi");
   expect(screen.queryByLabelText("Search language")).not.toBeInTheDocument();
-  fireEvent.click(screen.getByText("More filters"));
-  fireEvent.change(screen.getByRole("textbox", { name: "I’m looking for" }), { target: { value: "parcel" } });
-  fireEvent.change(screen.getByLabelText("Posting latitude"), { target: { value: "52.52" } });
-  fireEvent.change(screen.getByLabelText("Posting longitude"), { target: { value: "13.405" } });
-  fireEvent.change(screen.getByLabelText("Search radius (km)"), { target: { value: "25" } });
-  fireEvent.change(screen.getByLabelText("Reception latitude"), { target: { value: "50.0755" } });
-  fireEvent.change(screen.getByLabelText("Reception longitude"), { target: { value: "14.4378" } });
-  fireEvent.change(screen.getByLabelText("Posting from"), { target: { value: "2026-10-28T10:00" } });
-  fireEvent.change(screen.getByLabelText("Minimum width (cm)"), { target: { value: "10" } });
-  fireEvent.change(screen.getByLabelText("Maximum weight filter (kg)"), { target: { value: "20" } });
-  fireEvent.change(screen.getByLabelText("Ad owner's age range"), { target: { value: "RANGE_30_39" } });
-  fireEvent.change(screen.getByLabelText("Ad owner's gender"), { target: { value: "FEMALE" } });
-  fireEvent.change(screen.getByLabelText("Sort by"), { target: { value: "postingDate" } });
-  fireEvent.change(screen.getByLabelText("Sort direction"), { target: { value: "desc" } });
+  fireEvent.click(screen.getByText("Więcej filtrów"));
+  fireEvent.change(screen.getByRole("textbox", { name: "Szukam" }), { target: { value: "parcel" } });
+  fireEvent.change(screen.getByLabelText("Szerokość geograficzna miejsca nadania"), { target: { value: "52.52" } });
+  fireEvent.change(screen.getByLabelText("Długość geograficzna miejsca nadania"), { target: { value: "13.405" } });
+  fireEvent.change(screen.getByLabelText("Promień wyszukiwania (km)"), { target: { value: "25" } });
+  fireEvent.change(screen.getByLabelText("Szerokość geograficzna miejsca odbioru"), { target: { value: "50.0755" } });
+  fireEvent.change(screen.getByLabelText("Długość geograficzna miejsca odbioru"), { target: { value: "14.4378" } });
+  fireEvent.change(screen.getByLabelText("Nadanie od"), { target: { value: "2026-10-28T10:00" } });
+  fireEvent.change(screen.getByLabelText("Minimalna szerokość (cm)"), { target: { value: "10" } });
+  fireEvent.change(screen.getByLabelText("Maksymalna waga (kg)"), { target: { value: "20" } });
+  fireEvent.change(screen.getByLabelText("Wiek właściciela ogłoszenia"), { target: { value: "RANGE_30_39" } });
+  fireEvent.change(screen.getByLabelText("Płeć właściciela ogłoszenia"), { target: { value: "FEMALE" } });
+  fireEvent.change(screen.getByLabelText("Sortuj według"), { target: { value: "postingDate" } });
+  fireEvent.change(screen.getByLabelText("Kierunek sortowania"), { target: { value: "desc" } });
 
   await waitFor(() => {
     const request = window.fetch.mock.calls.find(([url]) => String(url).includes("/announcements/search?"));
@@ -512,7 +521,7 @@ test("filters to the signed-in user's ads and exposes owner actions", async () =
 });
 
 test("uses the browser locale for text search when the locale is not supported", async () => {
-  Object.defineProperty(window.navigator, "language", { configurable: true, value: "fr-FR" });
+  setBrowserLocale("fr-FR");
   render(<App />);
 
   fireEvent.change(screen.getByLabelText("I’m looking for"), { target: { value: "parcel" } });
@@ -591,7 +600,7 @@ test("shows the location picker and tracks which search field is active", async 
 });
 
 test("converts imperial parcel limits to the metric values stored by the backend", async () => {
-  Object.defineProperty(window.navigator, "language", { configurable: true, value: "en-US" });
+  setBrowserLocale("en-US");
   render(<App />);
 
   fireEvent.click(screen.getByText("More filters"));
@@ -682,7 +691,7 @@ test("prefills and saves every route field from the details edit form", async ()
   const supportsSvg = L.Browser.svg;
   L.Browser.svg = true;
   jest.spyOn(L.Map.prototype, "getSize").mockReturnValue(L.point(450, 300));
-  Object.defineProperty(window.navigator, "language", { configurable: true, value: "pl-PL" });
+  setBrowserLocale("pl-PL");
   window.sessionStorage.setItem("wayline.accessToken", "test-token");
   let savedRoute;
   const announcement = {
@@ -718,27 +727,27 @@ test("prefills and saves every route field from the details edit form", async ()
   });
 
   render(<App />);
-  fireEvent.click(await screen.findByRole("button", { name: "View Berlin to Prague" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Zobacz Berlin to Prague" }));
   const dialog = screen.getByRole("dialog");
-  fireEvent.click(within(dialog).getByRole("button", { name: "Edit route" }));
+  fireEvent.click(within(dialog).getByRole("button", { name: "Edytuj trasę" }));
 
-  expect(within(dialog).getByText("I need a parcel delivered")).toBeInTheDocument();
-  expect(within(dialog).getByText("Parcel needs a courier")).toBeInTheDocument();
-  expect(within(dialog).getByRole("heading", { name: "Where does your parcel need to go?" })).toBeInTheDocument();
-  expect(within(dialog).queryByRole("button", { name: "I can deliver a parcel" })).not.toBeInTheDocument();
-  expect(screen.getByRole("combobox", { name: "Starting city" })).toHaveValue("Berlin");
-  expect(screen.getByRole("combobox", { name: "Destination city" })).toHaveValue("Prague");
-  expect(screen.getByLabelText("Leaving")).toHaveValue("2026-10-28T10:00");
-  expect(screen.getByLabelText("Arriving by")).toHaveValue("2026-10-28T15:00");
-  expect(screen.getByLabelText("Maximum weight (kg)")).toHaveValue(5);
-  expect(screen.getByLabelText("Width (cm)")).toHaveValue(5);
-  expect(screen.getByLabelText("Height (cm)")).toHaveValue(20);
-  expect(screen.getByLabelText("Length (cm)")).toHaveValue(30);
-  expect(screen.getByRole("combobox", { name: "Stop address" })).toHaveValue("Dresden");
-  expect(within(dialog).getByRole("application", { name: "OpenStreetMap place picker" })).toBeInTheDocument();
+  expect(within(dialog).getByText("Chcę wysłać przesyłkę")).toBeInTheDocument();
+  expect(within(dialog).getByText("Przesyłka szuka kuriera")).toBeInTheDocument();
+  expect(within(dialog).getByRole("heading", { name: "Dokąd ma dotrzeć przesyłka?" })).toBeInTheDocument();
+  expect(within(dialog).queryByRole("button", { name: "Mogę dostarczyć przesyłkę" })).not.toBeInTheDocument();
+  expect(screen.getByRole("combobox", { name: "Miasto początkowe" })).toHaveValue("Berlin");
+  expect(screen.getByRole("combobox", { name: "Miasto docelowe" })).toHaveValue("Prague");
+  expect(screen.getByLabelText("Wyjazd")).toHaveValue("2026-10-28T10:00");
+  expect(screen.getByLabelText("Przyjazd najpóźniej")).toHaveValue("2026-10-28T15:00");
+  expect(within(dialog).getByLabelText("Maksymalna waga (kg)")).toHaveValue(5);
+  expect(screen.getByLabelText("Szerokość (cm)")).toHaveValue(5);
+  expect(screen.getByLabelText("Wysokość (cm)")).toHaveValue(20);
+  expect(screen.getByLabelText("Długość (cm)")).toHaveValue(30);
+  expect(screen.getByRole("combobox", { name: "Adres przystanku" })).toHaveValue("Dresden");
+  expect(within(dialog).getByRole("application", { name: "Wybór miejsca na mapie OpenStreetMap" })).toBeInTheDocument();
 
-  fireEvent.change(screen.getByLabelText("Give your route a title"), { target: { value: "Updated Berlin trip" } });
-  fireEvent.click(screen.getByRole("button", { name: /Save route/ }));
+  fireEvent.change(screen.getByLabelText("Nadaj trasie tytuł"), { target: { value: "Updated Berlin trip" } });
+  fireEvent.click(screen.getByRole("button", { name: /Zapisz trasę/ }));
 
   await waitFor(() => expect(savedRoute).toEqual(expect.objectContaining({
     type: "sender",
@@ -850,9 +859,9 @@ test("shows departure and arrival times and ordered stops in route details", asy
 
 test.each([
   ["en-US", "Up to 22 lb", "3.9 × 7.9 × 11.8 in"],
-  ["pl-PL", "Up to 10 kg", "10 × 20 × 30 cm"],
+  ["pl-PL", "Do 10 kg", "10 × 20 × 30 cm"],
 ])("formats stored metric parcel limits for the %s browser locale", async (locale, expectedWeight, expectedDimensions) => {
-  Object.defineProperty(window.navigator, "language", { configurable: true, value: locale });
+  setBrowserLocale(locale);
   window.fetch.mockResolvedValue({
     ok: true,
     text: async () => JSON.stringify({
@@ -871,7 +880,9 @@ test.each([
   });
 
   render(<App />);
-  fireEvent.click(await screen.findByRole("button", { name: "View Berlin to Prague" }));
+  fireEvent.click(await screen.findByRole("button", {
+    name: locale === "pl-PL" ? "Zobacz Berlin to Prague" : "View Berlin to Prague",
+  }));
 
   const dialog = screen.getByRole("dialog", { name: "Berlin to Prague" });
   expect(within(dialog).getByText(expectedWeight)).toBeInTheDocument();
@@ -1350,6 +1361,10 @@ test("defaults country from locale, allows changing country, and saves internati
   Object.defineProperty(window.navigator, "language", {
     configurable: true,
     value: "en-GB",
+  });
+  Object.defineProperty(window.navigator, "languages", {
+    configurable: true,
+    value: ["en-GB"],
   });
   window.sessionStorage.setItem("wayline.accessToken", "test-token");
   window.fetch.mockImplementation(async (url) => ({
