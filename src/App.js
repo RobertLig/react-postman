@@ -890,7 +890,7 @@ function App() {
                 placeholder="Destination"
               />
             </label>
-            <div className="filter-field">
+            <div className="filter-field ad-type-field">
               <Icon name="route" size={19} />
               <label htmlFor="route-type">Ad type</label>
               <select id="route-type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>

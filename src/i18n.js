@@ -16,7 +16,7 @@ const translations = {
     "Join free": "Dołącz za darmo",
     "Dismiss notification": "Zamknij powiadomienie",
     "A better way to get there": "Lepszy sposób, by dotrzeć do celu",
-    "Send it with": "Wyślij",
+    "Send it with": "Wyślij to z",
     someone: "kimś kto",
     "going your way.": "jedzie w Twoim kierunku.",
     "Need a parcel delivered, or already traveling and willing to carry one? Connect here for parcel delivery—not ride-sharing.":
@@ -145,7 +145,7 @@ const translations = {
     "Open a support thread or start a new one.": "Otwórz zgłoszenie lub utwórz nowe.",
     "Pick up where you left off": "Wróć do rozmowy",
     "Select a conversation to see your messages.": "Wybierz rozmowę, aby zobaczyć wiadomości.",
-    "Make the miles mean more.": "Niech każda mila ma znaczenie.",
+    "Make the miles mean more.": "Niech każdy kilometr ma znaczenie.",
     "View route details": "Zobacz szczegóły trasy",
     "See route details": "Zobacz szczegóły trasy",
     "Parcel needs a courier": "Przesyłka szuka kuriera",
