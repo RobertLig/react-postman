@@ -136,6 +136,26 @@ function coordinateLocation(label, latitude, longitude) {
     : null;
 }
 
+function getPageFromPath(pathname) {
+  const path = pathname.replace(/\/+$/, "") || "/";
+  return {
+    "/": "explore",
+    "/explore": "explore",
+    "/messages": "messages",
+    "/post": "post",
+    "/profile": "profile",
+  }[path] || "explore";
+}
+
+function getPathForPage(page) {
+  return {
+    explore: "/",
+    messages: "/messages",
+    post: "/post",
+    profile: "/profile",
+  }[page] || "/";
+}
+
 function roundedMeasurement(value, factor) {
   const converted = Number(value) * factor;
   return String(Math.round(converted * 10) / 10);
@@ -244,7 +264,7 @@ function App() {
     sortBy: "",
     sortDir: "asc",
   }));
-  const [page, setPage] = useState("explore");
+  const [page, setPageState] = useState(() => getPageFromPath(window.location.pathname));
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState("login");
@@ -269,6 +289,20 @@ function App() {
   const [sendingSupport, setSendingSupport] = useState(false);
   const [supportComposerOpen, setSupportComposerOpen] = useState(false);
   const [recentlyHiddenConversation, setRecentlyHiddenConversation] = useState(null);
+
+  const setPage = (nextPage) => {
+    const path = getPathForPage(nextPage);
+    if (window.location.pathname !== path) {
+      window.history.pushState({}, "", path);
+    }
+    setPageState(nextPage);
+  };
+
+  useEffect(() => {
+    const handlePopState = () => setPageState(getPageFromPath(window.location.pathname));
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   useEffect(() => () => searchMapReverseGeocodeController.current?.abort(), []);
 

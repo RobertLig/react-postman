@@ -7,6 +7,7 @@ import { getMeasurementSystem } from "./measurement";
 afterEach(() => {
   delete window.navigator.language;
   delete window.navigator.languages;
+  window.history.replaceState({}, "", "/");
 });
 
 function setBrowserLocale(locale) {
@@ -45,6 +46,17 @@ test("renders and loads route listings", async () => {
     expect.stringContaining("/announcements?page=0&size=12"),
     expect.objectContaining({ method: "GET" }),
   ));
+});
+
+test("loads a page from its URL and responds to browser history navigation", async () => {
+  window.history.replaceState({}, "", "/messages");
+  render(<App />);
+
+  expect(await screen.findByRole("heading", { name: "Conversations" })).toBeInTheDocument();
+
+  window.history.replaceState({}, "", "/");
+  fireEvent.popState(window);
+  expect(await screen.findByRole("heading", { name: /send it with someone going your way/i })).toBeInTheDocument();
 });
 
 test("shows the Messages nav dot for an unread update in any conversation", async () => {
