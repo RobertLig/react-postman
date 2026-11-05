@@ -34,7 +34,7 @@ test("requests place names using the browser's preferred language", async () => 
   }));
 });
 
-test("falls back to the browser language when the preference list is unavailable", async () => {
+test("uses Photon default language when the browser language is unsupported", async () => {
   Object.defineProperty(navigator, "languages", {
     configurable: true,
     value: undefined,
@@ -50,7 +50,7 @@ test("falls back to the browser language when the preference list is unavailable
 
   await searchLocations("Warszawa");
 
-  expect(new URL(global.fetch.mock.calls[0][0]).searchParams.get("lang")).toBe("pl");
+  expect(new URL(global.fetch.mock.calls[0][0]).searchParams.get("lang")).toBe("default");
 });
 
 test("reverse geocodes map clicks using the localized Photon endpoint", async () => {

@@ -1,5 +1,6 @@
 const PHOTON_ENDPOINT =
   process.env.REACT_APP_GEOCODING_URL || "https://photon.komoot.io/api/";
+const PHOTON_LANGUAGES = new Set(["de", "en", "fr"]);
 
 function getPreferredLanguage() {
   const preferences = [
@@ -11,13 +12,13 @@ function getPreferredLanguage() {
     if (typeof preference !== "string" || !preference.trim()) continue;
     try {
       const language = new Intl.Locale(preference).language;
-      if (language && language !== "und") return language;
+      if (language && PHOTON_LANGUAGES.has(language)) return language;
     } catch {
       continue;
     }
   }
 
-  return "en";
+  return "default";
 }
 
 function formatPlaceLabel(properties) {
