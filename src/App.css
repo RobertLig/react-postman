@@ -567,3 +567,43 @@ h1, h2, h3, p { margin-top: 0; }
   .route-category { font-size: 6px; }
   .cta-button { max-width: 120px; white-space: normal; }
 }
+
+@media (prefers-color-scheme: dark) {
+  body, .app-shell { color: var(--color-base-content); background: var(--color-base-100); }
+  .topbar, .site-footer, .conversation-list, .chat-header, .chat-compose, .profile-identity, .delete-account, .post-submit, .form-section, .advanced-search-filters, .route-card-bottom { border-color: var(--line); }
+  .search-panel, .results-count, .route-card, .card-arrow, .pagination button, .empty-state, .outline-button, .detail-dialog, .auth-dialog, .detail-schedule > div, .location-suggestions, .post-form, .type-option, .sortable-controls button, .profile-card, .inbox, .inbox-tabs button.selected, .support-request-form textarea, .chat-message p, .attachment-link, .chat-compose input, .chat-search, .chat-search input, .profile-form input, .profile-form select, .profile-form .react-tel-input .form-control, .profile-form .react-tel-input .flag-dropdown, .delete-account button, .art-card, .route-category, .route-art-symbol {
+    color: var(--color-base-content);
+    border-color: var(--line);
+    background-color: var(--paper);
+  }
+  .detail-body, .auth-dialog, .post-page, .profile-page, .messages-page { color: var(--color-base-content); }
+  .hero h1, .section-heading h2, .messages-title h1, .post-intro h1, .route-card-content h3, .detail-body h2, .detail-route b, .detail-schedule time, .auth-brand, .auth-dialog h2, .post-form legend, .form-section h2, .post-auth h1, .profile-identity h2, .message-placeholder h2, .support-request-form h2, .support-request-form p, .conversation-meta b, .chat-header > div b {
+    color: var(--color-base-content);
+  }
+  .hero-copy > p, .hero-proof, .section-heading p, .messages-title > p, .route-card-content > p, .route-card-meta, .poster-caption, .bottom-cta p, .site-footer, .detail-description, .detail-facts span, .detail-route small, .detail-schedule small, .detail-stops li, .dialog-footnote, .auth-subtitle, .terms-field, .privacy-note, .post-intro p, .field-hint, .stops-heading p, .profile-identity p, .conversation-meta small, .conversation-empty, .message-placeholder p, .chat-header > div small, .chat-message time, .reaction-bar span, .typing-indicator, .chat-welcome p, .chat-error, .nav-link, .text-button, .art-card small {
+    color: var(--ink-soft);
+  }
+  .search-field, .filter-field, .search-label, .filter-field > label, .location-field .field-name, .advanced-search-grid > label, .inbox-label, .chat-message p, .profile-form > label, .profile-field-heading label, .announcement-edit-form label, .location-autocomplete label, .location-map-heading, .support-request-form textarea, .post-form label, .auth-form > label:not(.terms-field) {
+    color: var(--color-base-content);
+  }
+  .search-field input, .location-field input, .advanced-search-grid input, .advanced-search-grid select, .announcement-edit-form input, .announcement-edit-form textarea, .auth-form input:not([type="checkbox"]), .post-form input, .post-form textarea, .profile-form input, .profile-form select, .profile-form .react-tel-input .form-control, .chat-compose input, .chat-search input, .support-request-form textarea {
+    color: var(--color-base-content);
+    background-color: var(--color-base-100);
+  }
+  .hero-art, .route-card-art, .detail-banner, .bottom-cta { background: var(--color-base-300); }
+  .route-city { color: var(--color-base-content); }
+  .chat-messages, .conversation-row:hover, .conversation-row.selected, .conversation-row-wrap.selected, .inbox-tabs, .auth-tabs, .auth-tabs button.selected, .conversation-dismiss:hover, .chat-date, .selected-files .selected-photo, .detail-route, .stop-row, .detail-stops li span, .type-option.chosen, .form-error, .inline-error, .location-suggestions button:hover, .location-suggestions button.active, .location-map-help, .profile-form .react-tel-input .flag-dropdown.open, .profile-form .react-tel-input .flag-dropdown:hover, .inbox-label span, .new-support-button, .chat-compose .attach-button {
+    color: var(--color-base-content);
+    border-color: var(--line);
+    background-color: var(--color-base-300);
+  }
+  .inbox-tabs button, .auth-tabs button, .location-suggestions button, .conversation-row, .message-meta button, .block-user-button, .delete-route-button, .remove-stop, .signout-button, .avatar-upload, .avatar-remove {
+    color: var(--color-base-content);
+  }
+  .chat-message.mine p { border-color: var(--line); background: color-mix(in oklch, var(--color-primary) 24%, var(--color-base-200)); }
+  .empty-icon, .proof-check, .art-icon, .type-option-icon, .support-request-icon { background-color: var(--color-base-300); }
+  .form-error, .inline-error { border-color: color-mix(in oklch, var(--color-error) 40%, var(--color-base-100)); color: var(--color-error); }
+  .notice { border-color: color-mix(in oklch, var(--color-success) 40%, var(--color-base-100)); color: var(--color-success); background: var(--color-base-200); }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip, .leaflet-control-zoom a, .leaflet-control-attribution { color: var(--color-base-content); background: var(--color-base-200); }
+  .leaflet-container { color: var(--color-base-content); }
+}

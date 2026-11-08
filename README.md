@@ -80,6 +80,35 @@ In dev/test, the API links verification and password-reset emails to
 environment to the public frontend origin (for example,
 `https://app.example.com`).
 
+## Deploy to Cloudflare Pages
+
+Create a Pages project connected to this repository and use:
+
+- **Build command:** `npm run build`
+- **Build output directory:** `build`
+- **Root directory:** `/` (the repository root)
+
+Set these build environment variables in the Pages project:
+
+- `REACT_APP_API_URL`: the public Quarkus API URL, such as
+  `https://myapp-quarkus.onrender.com`
+- `REACT_APP_GOOGLE_CLIENT_ID`: optional; defaults to the Google client ID
+  already used by the app
+
+The `public/_redirects` file makes direct visits and refreshes on client-side
+routes serve the React app. After the first successful deployment, Cloudflare
+Pages shows the site's public URL, typically
+`https://<project-name>.pages.dev`.
+
+In the Render API service, set `FRONTEND_BASE_URL` to that frontend origin
+(for example, `https://wayline.pages.dev`) so verification and password-reset
+links open the website. Include that origin in `CORS_ORIGINS` so browsers can
+call the API; retain `http://localhost:3000` there too if you still call the
+deployed API from your local frontend. Add the frontend origin to the Google
+OAuth client's authorized JavaScript origins as well. If the Pages URL
+changes, update these origin settings and redeploy the frontend if its API URL
+changes.
+
 ## Scripts
 
 - `npm start` starts the development server.
