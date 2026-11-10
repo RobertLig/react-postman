@@ -97,7 +97,9 @@ Pages shows the site's public URL, typically
 
 Include the frontend origin in `CORS_ORIGINS` so browsers can call the API;
 retain `http://localhost:3000` there too if you call the deployed API from your
-local frontend. Add the frontend origin to the Google OAuth client's
+local frontend. Because the default Cloudflare Pages and Render hostnames are
+cross-site, the API's HTTPS refresh cookie must use `SameSite=None; Secure`.
+Add the frontend origin to the Google OAuth client's
 authorized JavaScript origins as well. If the Pages URL changes, update these
 origin settings and redeploy the frontend if its API URL changes.
 

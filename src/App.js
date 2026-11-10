@@ -26,6 +26,8 @@ import { getLocale, LocalizedText, translate } from "./i18n";
 const GOOGLE_CLIENT_ID =
   process.env.REACT_APP_GOOGLE_CLIENT_ID ||
   "456614025207-m4ljumnedhiku3qo8t2fgci9r02ukoci.apps.googleusercontent.com";
+let activeGoogleCallback = null;
+let googleClientInitialized = false;
 
 function getDefaultPhoneCountry() {
   try {
@@ -688,24 +690,20 @@ function App() {
     setNotice(`Welcome${authResponse.user?.name ? `, ${authResponse.user.name.split(" ")[0]}` : ""}!`);
   };
 
-  const handleLogout = async () => {
-    try {
-      await apiRequest("/auth/logout", { method: "POST", token });
-    } catch (error) {
-      setNotice(getErrorMessage(error));
-    } finally {
-      clearSession();
-      setToken("");
-      setUser(null);
-      setRole("");
-      setMyAdsOnly(false);
-      setConversations([]);
-      setSupportConversations([]);
-      setMessages([]);
-      setMessagesConversationId(null);
-      messagesConversationIdRef.current = null;
-      setPage("explore");
-    }
+  const handleLogout = () => {
+    apiRequest("/auth/logout", { method: "POST" })
+      .catch((error) => setNotice(getErrorMessage(error)));
+    clearSession();
+    setToken("");
+    setUser(null);
+    setRole("");
+    setMyAdsOnly(false);
+    setConversations([]);
+    setSupportConversations([]);
+    setMessages([]);
+    setMessagesConversationId(null);
+    messagesConversationIdRef.current = null;
+    setPage("explore");
   };
 
   const handleDeleteAccount = async () => {
@@ -1789,8 +1787,9 @@ function AuthDialog({ onClose, onAuthenticated }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [googleElement, setGoogleElement] = useState(null);
+  const googleCallbackRef = useRef(null);
 
-  const googleCallback = useCallback(async (response) => {
+  googleCallbackRef.current = async (response) => {
     setBusy(true);
     setError("");
     try {
@@ -1801,19 +1800,31 @@ function AuthDialog({ onClose, onAuthenticated }) {
     } finally {
       setBusy(false);
     }
-  }, [onAuthenticated]);
+  };
 
   useEffect(() => {
+    const currentCallback = (response) => googleCallbackRef.current?.(response);
+    activeGoogleCallback = currentCallback;
     const renderGoogleButton = () => {
       if (!window.google?.accounts?.id || !googleElement) return;
-      window.google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: googleCallback });
+      if (!googleClientInitialized) {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: (response) => activeGoogleCallback?.(response),
+        });
+        googleClientInitialized = true;
+      }
+      googleElement.replaceChildren();
       window.google.accounts.id.renderButton(googleElement, { theme: "outline", size: "large", shape: "pill", width: 340, text: "continue_with" });
     };
     renderGoogleButton();
     const script = document.querySelector('script[src*="accounts.google.com/gsi/client"]');
     script?.addEventListener("load", renderGoogleButton);
-    return () => script?.removeEventListener("load", renderGoogleButton);
-  }, [googleElement, googleCallback]);
+    return () => {
+      script?.removeEventListener("load", renderGoogleButton);
+      if (activeGoogleCallback === currentCallback) activeGoogleCallback = null;
+    };
+  }, [googleElement]);
   return (
     <LocalizedText>
     <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
