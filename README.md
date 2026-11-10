@@ -4,7 +4,8 @@ Wayline is a React interface for the Quarkus API in `../quarkus-demo/myapp`.
 It connects people who need a parcel delivered with travelers already heading
 that way and willing to carry it. Members can post an ad looking for a courier
 or offer to deliver a parcel; Wayline is for parcel delivery, not ride-sharing.
-The frontend supports Google sign-in and account creation,
+Users can register and sign in only with Google; the frontend does not provide
+email-and-password authentication. It also supports
 browsing/searching delivery ads, route and profile photo uploads, route
 management, direct messages with attachments/reactions/live updates, member
 block controls, and a role-gated support inbox for administrators. Profile
