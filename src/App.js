@@ -1232,7 +1232,7 @@ function App() {
         </main>
       )}
 
-      <footer className="site-footer"><a className="footer-brand" href="#explore" onClick={(event) => { event.preventDefault(); setPage("explore"); }}>wayline<span>.</span></a><span>Make the miles mean more.</span><span>© {new Date().getFullYear()} Wayline</span></footer>
+      <footer className="site-footer"><a className="footer-brand" href="#explore" onClick={(event) => { event.preventDefault(); setPage("explore"); }}>wayline<span>.</span></a><span>Make the miles mean more.</span><nav className="legal-links" aria-label="Legal"><a href="/privacy/">{translate("Privacy policy")}</a><a href="/terms/">{translate("Terms of service")}</a></nav><span>© {new Date().getFullYear()} Wayline</span></footer>
 
       {selectedAnnouncement && <AnnouncementDialog
         announcement={selectedAnnouncement}

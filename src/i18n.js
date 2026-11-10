@@ -198,6 +198,8 @@ const translations = {
     "Save changes": "Zapisz zmiany",
     "Sign out": "Wyloguj się",
     "Delete account": "Usuń konto",
+    "Privacy policy": "Polityka prywatności",
+    "Terms of service": "Warunki korzystania",
     "Permanently remove your account and route listings.":
       "Trwale usuń konto i ogłoszenia dotyczące tras.",
     "Deleting...": "Usuwanie...",
