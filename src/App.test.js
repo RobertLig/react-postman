@@ -1087,14 +1087,15 @@ test("loads sender photos for details and edit when listings omit the photo coll
   );
 });
 
-test("opens the account dialog from the header", async () => {
+test("opens Google-only sign-in from the header", async () => {
   render(<App />);
 
-  fireEvent.click(screen.getByRole("button", { name: "Log in" }));
+  fireEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
 
-  expect(screen.getByRole("dialog", { name: "Welcome back." })).toBeInTheDocument();
-  expect(screen.getByLabelText("Email address")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Forgot your password?" })).toBeInTheDocument();
+  expect(screen.getByRole("dialog", { name: "Welcome to Wayline." })).toBeInTheDocument();
+  expect(screen.getByText("Create an account or sign in securely with your Google account.")).toBeInTheDocument();
+  expect(screen.queryByLabelText("Email address")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
 });
 
 test("shows parcel photos only for ads requesting a courier", async () => {

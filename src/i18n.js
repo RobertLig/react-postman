@@ -12,8 +12,7 @@ const translations = {
     "Post an ad": "Dodaj ogłoszenie",
     "Profile settings": "Ustawienia profilu",
     Account: "Konto",
-    "Log in": "Zaloguj się",
-    "Join free": "Dołącz za darmo",
+    "Continue with Google": "Kontynuuj przez Google",
     "Dismiss notification": "Zamknij powiadomienie",
     "A better way to get there": "Lepszy sposób, by dotrzeć do celu",
     "Send it with": "Wyślij to z",
@@ -115,7 +114,6 @@ const translations = {
     "Your route has been removed.": "Twoja trasa została usunięta.",
     "This member has been unblocked.": "Ten użytkownik został odblokowany.",
     "This member has been blocked.": "Ten użytkownik został zablokowany.",
-    "Your email has been verified. You can now sign in.": "Twój adres e-mail został potwierdzony. Możesz się teraz zalogować.",
     "Your session expired. Please sign in again.": "Twoja sesja wygasła. Zaloguj się ponownie.",
     "Conversation restored.": "Rozmowa została przywrócona.",
     "Sign in to message the person who posted this route.": "Zaloguj się, aby napisać do autora tej trasy.",
@@ -158,7 +156,6 @@ const translations = {
     "Send message": "Wyślij wiadomość",
     "is typing": "pisze",
     "They": "Ktoś",
-    "Sign in with Google": "Zaloguj się przez Google",
     stops: "przystanków",
     "Looking for a traveler to deliver this parcel.":
       "Szukam osoby, która dostarczy tę przesyłkę.",
@@ -192,8 +189,6 @@ const translations = {
     "Prefer not to say": "Wolę nie podawać",
     "Phone number": "Numer telefonu",
     "Clear phone number": "Wyczyść numer telefonu",
-    "New password": "Nowe hasło",
-    "Leave blank to keep your password": "Pozostaw puste, aby zachować obecne hasło",
     "Saving...": "Zapisywanie...",
     "Save changes": "Zapisz zmiany",
     "Sign out": "Wyloguj się",
@@ -287,31 +282,10 @@ const translations = {
       "Aktualizacje na żywo są niedostępne. Nadal możesz wysyłać wiadomości.",
     "Close sign in": "Zamknij logowanie",
     "GOOD TO HAVE YOU HERE": "MIŁO CIĘ WIDZIEĆ",
-    "Forgot your password?": "Nie pamiętasz hasła?",
-    "Choose a new password.": "Ustaw nowe hasło.",
-    "Welcome back.": "Witaj ponownie.",
-    "Find your way in.": "Dołącz do nas.",
-    "Enter the email address on your account and we’ll send reset instructions.":
-      "Podaj adres e-mail powiązany z kontem, a wyślemy instrukcje resetowania hasła.",
-    "Set a new password to get back to your Wayline account.":
-      "Ustaw nowe hasło, aby wrócić do konta Wayline.",
-    "Your next good connection is just around the corner.":
-      "Kolejna dobra znajomość jest bliżej, niż myślisz.",
-    "Join a community that makes every journey count.":
-      "Dołącz do społeczności, dzięki której każda podróż ma znaczenie.",
-    "Create account": "Utwórz konto",
-    "Your name": "Twoje imię",
-    "What should we call you?": "Jak mamy się do Ciebie zwracać?",
-    Password: "Hasło",
-    "At least 8 characters": "Co najmniej 8 znaków",
-    "I agree to the terms and understand how Wayline works.":
-      "Akceptuję warunki i rozumiem, jak działa Wayline.",
-    "One moment...": "Chwileczkę...",
-    "Send reset instructions": "Wyślij instrukcje resetowania",
-    "Update password": "Zmień hasło",
-    "Log in to Wayline": "Zaloguj się do Wayline",
-    "Create my account": "Utwórz konto",
-    "or continue with": "lub kontynuuj przez",
+    "Welcome to Wayline.": "Witamy w Wayline.",
+    "Create an account or sign in securely with your Google account.":
+      "Utwórz konto lub zaloguj się bezpiecznie przez konto Google.",
+    "Signing in...": "Logowanie...",
     "Your details stay yours. We’re here to help people connect.":
       "Twoje dane należą do Ciebie. Pomagamy ludziom nawiązywać kontakty.",
     "Back to log in": "Wróć do logowania",
@@ -359,12 +333,6 @@ const translations = {
       "Usunąć tę trasę i jej zdjęcia? Tej czynności nie można cofnąć.",
     "Permanently delete your account, routes, and account data? This cannot be undone.":
       "Trwale usunąć konto, trasy i dane konta? Tej czynności nie można cofnąć.",
-    "Account created. Check your email to verify your address before signing in.":
-      "Konto zostało utworzone. Potwierdź adres e-mail przed zalogowaniem.",
-    "If the email is registered, password reset instructions are on their way.":
-      "Jeśli ten adres e-mail jest zarejestrowany, instrukcje resetowania hasła są już w drodze.",
-    "Password reset complete. Sign in with your new password.":
-      "Hasło zostało zresetowane. Zaloguj się przy użyciu nowego hasła.",
     "Google sign-in": "Logowanie przez Google",
     "Support conversation": "Rozmowa z pomocą",
     "Open conversation": "Otwarta rozmowa",

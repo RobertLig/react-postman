@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="How Wayline handles account, delivery, messaging, and Google Gmail sending data.">
+    <meta name="description" content="How Wayline handles account, delivery, messaging, and Google sign-in information.">
     <link rel="stylesheet" href="/legal.css">
     <title>Privacy policy — Wayline</title>
     <script defer src="/legal.js"></script>
@@ -20,7 +20,7 @@
 
         <h2>Information we handle</h2>
         <ul>
-          <li><strong>Account information:</strong> name, email address, password (stored as a salted hash), and, if you add them, phone number, profile photo, age range, gender, and language preference. If you sign in with Google, we receive account information needed to authenticate you.</li>
+          <li><strong>Account information:</strong> your name and email address from Google sign-in, plus, if you add them, phone number, profile photo, age range, gender, and language preference.</li>
           <li><strong>Delivery listings:</strong> route and stop descriptions, locations and coordinates, dates, parcel descriptions, optional size and weight details, and listing photos. Listings and the profile details shown with them are visible to other users and may be publicly accessible.</li>
           <li><strong>Communications:</strong> messages, support requests, reactions, and files you attach to conversations.</li>
           <li><strong>Service and security information:</strong> authentication and session data, and technical information such as IP addresses used to operate the service and protect it from abuse.</li>
@@ -28,14 +28,14 @@
         </ul>
 
         <h2>How we use information</h2>
-        <p>We use information to create and secure accounts, display and search delivery listings, connect users, provide conversations and support, send account-related emails, and maintain and improve the service. We do not sell personal information.</p>
+        <p>We use information to create and secure accounts, display and search delivery listings, connect users, provide conversations and support, and maintain and improve the service. We do not sell personal information.</p>
 
-        <h2>Google sign-in and Gmail sending</h2>
-        <p>Google sign-in is used to verify your identity. Separately, when you authorize Gmail sending, Wayline uses the Google <code>gmail.send</code> permission only to send email. We do not use this permission to read, search, or delete messages in your Gmail inbox. The OAuth credentials used for Gmail are stored and handled on Wayline’s backend; they are not stored in your browser. You can revoke Google access in your Google Account settings.</p>
+        <h2>Google sign-in</h2>
+        <p>Wayline uses Google sign-in to verify your identity and create or access your Wayline account. The app receives the identity information needed for sign-in, such as your Google account email address and name. Wayline does not request access to your Gmail messages or use the <code>gmail.send</code> permission. You can manage or revoke Wayline’s Google sign-in access in your Google Account settings.</p>
         <p>This is separate from your Wayline session: the browser keeps a short-lived Wayline access token in session storage and receives a refresh-token cookie to maintain your sign-in.</p>
 
         <h2>When information is shared</h2>
-        <p>Your public listings are shared with people who visit Wayline. Messages and files are shared with conversation participants. We also use service providers to host and operate the app, store its data and files, provide Google sign-in and Gmail sending, and provide map or location-search features. Those providers receive information needed for their service. We may also disclose information when required by law or to protect the service and its users.</p>
+        <p>Your public listings are shared with people who visit Wayline. Messages and files are shared with conversation participants. We also use service providers to host and operate the app, store its data and files, provide Google sign-in, and provide map or location-search features. Those providers receive information needed for their service. We may also disclose information when required by law or to protect the service and its users.</p>
 
         <h2>Storage and deletion</h2>
         <p>We keep account and service information while it is needed to provide Wayline. You can delete your account from Profile settings. Account details, listings, and associated uploaded files are removed as part of account deletion. Messages in shared conversations may be retained for the other participants, with your account identity removed from those messages.</p>
@@ -53,7 +53,7 @@
 
         <h2>Przetwarzane informacje</h2>
         <ul>
-          <li><strong>Dane konta:</strong> imię i nazwisko, adres e-mail, hasło (przechowywane jako skrót z solą) oraz, jeśli je dodasz, numer telefonu, zdjęcie profilowe, przedział wiekowy, płeć i preferowany język. Jeśli logujesz się przez Google, otrzymujemy dane potrzebne do potwierdzenia tożsamości.</li>
+          <li><strong>Dane konta:</strong> imię i adres e-mail z logowania Google oraz, jeśli je dodasz, numer telefonu, zdjęcie profilowe, przedział wiekowy, płeć i preferowany język.</li>
           <li><strong>Ogłoszenia o dostawie:</strong> opisy trasy i przystanków, lokalizacje i współrzędne, daty, opisy przesyłek, opcjonalne wymiary i waga oraz zdjęcia ogłoszeń. Ogłoszenia i widoczne przy nich dane profilu są udostępniane innym użytkownikom i mogą być publicznie dostępne.</li>
           <li><strong>Komunikacja:</strong> wiadomości, zgłoszenia do pomocy, reakcje i pliki dołączone do rozmów.</li>
           <li><strong>Dane techniczne i bezpieczeństwa:</strong> informacje o uwierzytelnianiu i sesji oraz dane techniczne, takie jak adresy IP, wykorzystywane do działania usługi i ochrony przed nadużyciami.</li>
@@ -61,14 +61,14 @@
         </ul>
 
         <h2>Jak wykorzystujemy informacje</h2>
-        <p>Wykorzystujemy informacje do tworzenia i zabezpieczania kont, wyświetlania i wyszukiwania ogłoszeń, łączenia użytkowników, obsługi rozmów i pomocy, wysyłania wiadomości dotyczących konta oraz utrzymywania i ulepszania usługi. Nie sprzedajemy danych osobowych.</p>
+        <p>Wykorzystujemy informacje do tworzenia i zabezpieczania kont, wyświetlania i wyszukiwania ogłoszeń, łączenia użytkowników, obsługi rozmów i pomocy oraz utrzymywania i ulepszania usługi. Nie sprzedajemy danych osobowych.</p>
 
-        <h2>Logowanie przez Google i wysyłanie e-maili przez Gmail</h2>
-        <p>Logowanie przez Google służy do potwierdzenia Twojej tożsamości. Niezależnie od tego, gdy wyrazisz zgodę na wysyłanie wiadomości przez Gmail, Wayline korzysta z uprawnienia Google <code>gmail.send</code> wyłącznie do wysyłania e-maili. Nie używamy tego uprawnienia do odczytywania, przeszukiwania ani usuwania wiadomości ze skrzynki Gmail. Dane uwierzytelniające OAuth używane do Gmaila są przechowywane i obsługiwane na backendzie Wayline, a nie w przeglądarce. Dostęp Google możesz cofnąć w ustawieniach konta Google.</p>
-        <p>Jest to niezależne od sesji Wayline: przeglądarka przechowuje krótkotrwały token dostępu Wayline w pamięci sesji i otrzymuje plik cookie z tokenem odświeżania, aby utrzymać zalogowanie.</p>
+        <h2>Logowanie przez Google</h2>
+        <p>Wayline korzysta z logowania Google, aby potwierdzić Twoją tożsamość oraz utworzyć konto Wayline lub uzyskać do niego dostęp. Aplikacja otrzymuje informacje potrzebne do logowania, takie jak adres e-mail i imię z konta Google. Wayline nie prosi o dostęp do wiadomości Gmail ani nie korzysta z uprawnienia <code>gmail.send</code>. Dostęp Wayline do logowania Google możesz sprawdzić lub cofnąć w ustawieniach konta Google.</p>
+        <p>Po zalogowaniu przeglądarka przechowuje krótkotrwały token dostępu Wayline w pamięci sesji i otrzymuje plik cookie z tokenem odświeżania, aby utrzymać zalogowanie.</p>
 
         <h2>Kiedy udostępniamy informacje</h2>
-        <p>Twoje publiczne ogłoszenia są udostępniane osobom odwiedzającym Wayline. Wiadomości i pliki są udostępniane uczestnikom rozmowy. Korzystamy też z usługodawców, którzy hostują i obsługują aplikację, przechowują jej dane i pliki, zapewniają logowanie Google i wysyłanie wiadomości przez Gmail oraz obsługują mapy i wyszukiwanie lokalizacji. Otrzymują oni informacje potrzebne do świadczenia swoich usług. Możemy również ujawnić informacje, jeśli wymaga tego prawo lub jest to konieczne do ochrony usługi i jej użytkowników.</p>
+        <p>Twoje publiczne ogłoszenia są udostępniane osobom odwiedzającym Wayline. Wiadomości i pliki są udostępniane uczestnikom rozmowy. Korzystamy też z usługodawców, którzy hostują i obsługują aplikację, przechowują jej dane i pliki, zapewniają logowanie Google oraz obsługują mapy i wyszukiwanie lokalizacji. Otrzymują oni informacje potrzebne do świadczenia swoich usług. Możemy również ujawnić informacje, jeśli wymaga tego prawo lub jest to konieczne do ochrony usługi i jej użytkowników.</p>
 
         <h2>Przechowywanie i usuwanie</h2>
         <p>Przechowujemy dane konta i informacje o korzystaniu z usługi tak długo, jak są potrzebne do świadczenia Wayline. Możesz usunąć konto w ustawieniach profilu. W ramach usuwania konta usuwane są dane konta, ogłoszenia i powiązane przesłane pliki. Wiadomości we wspólnych rozmowach mogą pozostać dostępne dla pozostałych uczestników, ale usuwamy z nich powiązanie z Twoim kontem.</p>

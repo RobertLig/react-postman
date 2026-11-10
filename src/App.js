@@ -26,7 +26,6 @@ import { getLocale, LocalizedText, translate } from "./i18n";
 const GOOGLE_CLIENT_ID =
   process.env.REACT_APP_GOOGLE_CLIENT_ID ||
   "456614025207-m4ljumnedhiku3qo8t2fgci9r02ukoci.apps.googleusercontent.com";
-let verificationTokenInProgress = "";
 
 function getDefaultPhoneCountry() {
   try {
@@ -267,8 +266,6 @@ function App() {
   const [page, setPageState] = useState(() => getPageFromPath(window.location.pathname));
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
   const [authOpen, setAuthOpen] = useState(false);
-  const [authMode, setAuthMode] = useState("login");
-  const [resetToken, setResetToken] = useState("");
   const [notice, setNotice] = useState("");
   const [conversations, setConversations] = useState([]);
   const [supportConversations, setSupportConversations] = useState([]);
@@ -404,28 +401,6 @@ function App() {
       }
     }
   };
-
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    const resetValue = url.searchParams.get("token");
-    if (url.pathname.endsWith("/auth/reset") && resetValue) {
-      setResetToken(resetValue);
-      setAuthMode("reset-confirm");
-      setAuthOpen(true);
-      return;
-    }
-    if (url.pathname.endsWith("/auth/verify") && resetValue) {
-      if (verificationTokenInProgress === resetValue) return;
-      verificationTokenInProgress = resetValue;
-      apiRequest(`/auth/verify?token=${encodeURIComponent(resetValue)}`)
-        .then((response) => setNotice(response?.message || "Your email has been verified. You can now sign in."))
-        .catch((error) => setNotice(getErrorMessage(error)))
-        .finally(() => {
-          verificationTokenInProgress = "";
-          window.history.replaceState({}, "", "/");
-        });
-    }
-  }, []);
 
   useEffect(() => {
     const handleExpired = () => {
@@ -860,10 +835,7 @@ function App() {
               </button>
             </>
           ) : (
-            <>
-              <button className="text-button" onClick={() => { setAuthMode("login"); setAuthOpen(true); }}>Log in</button>
-              <button className="post-button" onClick={() => { setAuthMode("register"); setAuthOpen(true); }}>Join free <Icon name="arrow" size={16} /></button>
-            </>
+            <button className="post-button" onClick={() => setAuthOpen(true)}>Continue with Google <Icon name="arrow" size={16} /></button>
           )}
         </div>
       </header>
@@ -1251,7 +1223,7 @@ function App() {
         }}
         user={user}
       />}
-      {authOpen && <AuthDialog initialMode={authMode} resetToken={resetToken} onClose={() => setAuthOpen(false)} onAuthenticated={handleAuth} onNotice={setNotice} />}
+      {authOpen && <AuthDialog onClose={() => setAuthOpen(false)} onAuthenticated={handleAuth} />}
       </div>
     </LocalizedText>
   );
@@ -1293,7 +1265,6 @@ function ProfilePage({ token, user, onSave, onSignOut, onDeleteAccount, onRequir
   const [phone, setPhone] = useState(() => getPhoneInputValue(user?.phone));
   const [phoneCountry] = useState(getDefaultPhoneCountry);
   const [phoneDialCode, setPhoneDialCode] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
@@ -1333,10 +1304,8 @@ function ProfilePage({ token, user, onSave, onSignOut, onDeleteAccount, onRequir
           gender: gender || null,
           phone: toInternationalPhone(phone, phoneDialCode),
           locale: navigator.language?.toLowerCase().startsWith("pl") ? "pl" : "en",
-          ...(password ? { password } : {}),
         },
       });
-      setPassword("");
       onSave(updated);
     } catch (failure) {
       setError(getErrorMessage(failure));
@@ -1449,7 +1418,6 @@ function ProfilePage({ token, user, onSave, onSignOut, onDeleteAccount, onRequir
             dropdownClass="profile-phone-country-list"
           />
         </div>
-        <label>New password <span className="optional-label">optional</span><input type="password" minLength="8" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" placeholder="Leave blank to keep your password" /></label>
         {error && <div className="form-error" role="alert">{error}</div>}
         <div className="profile-actions"><button className="dialog-primary" disabled={busy || deleteBusy}>{busy ? "Saving..." : "Save changes"}<Icon name="check" size={16} /></button><button type="button" className="signout-button" onClick={onSignOut}><Icon name="logout" size={16} />Sign out</button></div>
         <div className="delete-account"><div><b>Delete account</b><span>Permanently remove your account and route listings.</span></div><button type="button" disabled={deleteBusy} onClick={deleteAccount}>{deleteBusy ? "Deleting..." : "Delete account"}</button></div>
@@ -1817,9 +1785,7 @@ function sortStopsByPosition(stops) {
     });
 }
 
-function AuthDialog({ initialMode, resetToken, onClose, onAuthenticated, onNotice }) {
-  const [mode, setMode] = useState(initialMode);
-  const [form, setForm] = useState({ name: "", email: "", password: "", termsAccepted: false });
+function AuthDialog({ onClose, onAuthenticated }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [googleElement, setGoogleElement] = useState(null);
@@ -1839,7 +1805,6 @@ function AuthDialog({ initialMode, resetToken, onClose, onAuthenticated, onNotic
 
   useEffect(() => {
     const renderGoogleButton = () => {
-      if (mode === "reset-request" || mode === "reset-confirm") return;
       if (!window.google?.accounts?.id || !googleElement) return;
       window.google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: googleCallback });
       window.google.accounts.id.renderButton(googleElement, { theme: "outline", size: "large", shape: "pill", width: 340, text: "continue_with" });
@@ -1848,52 +1813,7 @@ function AuthDialog({ initialMode, resetToken, onClose, onAuthenticated, onNotic
     const script = document.querySelector('script[src*="accounts.google.com/gsi/client"]');
     script?.addEventListener("load", renderGoogleButton);
     return () => script?.removeEventListener("load", renderGoogleButton);
-  }, [googleElement, googleCallback, mode]);
-
-  const submit = async (event) => {
-    event.preventDefault();
-    setBusy(true);
-    setError("");
-    try {
-      if (mode === "register") {
-        await apiRequest("/auth/register", {
-          method: "POST",
-          body: {
-            name: form.name,
-            email: form.email,
-            password: form.password,
-            termsAccepted: form.termsAccepted,
-            locale: navigator.language?.toLowerCase().startsWith("pl") ? "pl" : "en",
-            trap: "",
-          },
-        });
-        onClose();
-        onNotice("Account created. Check your email to verify your address before signing in.");
-      } else if (mode === "reset-request") {
-        const response = await apiRequest("/auth/reset/request", {
-          method: "POST",
-          body: { email: form.email, trap: "" },
-        });
-        setMode("login");
-        onNotice(response?.message || "If the email is registered, password reset instructions are on their way.");
-      } else if (mode === "reset-confirm") {
-        const response = await apiRequest("/auth/reset/confirm", {
-          method: "POST",
-          body: { token: resetToken, password: form.password },
-        });
-        setMode("login");
-        window.history.replaceState({}, "", "/");
-        onNotice(response?.message || "Password reset complete. Sign in with your new password.");
-      } else {
-        const response = await apiRequest("/auth/login", { method: "POST", body: { email: form.email, password: form.password, trap: "" } });
-        onAuthenticated(response);
-      }
-    } catch (failure) {
-      setError(getErrorMessage(failure));
-    } finally {
-      setBusy(false);
-    }
-  };
+  }, [googleElement, googleCallback]);
   return (
     <LocalizedText>
     <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
@@ -1901,20 +1821,12 @@ function AuthDialog({ initialMode, resetToken, onClose, onAuthenticated, onNotic
         <button className="modal-close" onClick={onClose} aria-label="Close sign in"><Icon name="close" size={20} /></button>
         <div className="auth-brand"><span className="brand-mark"><Icon name="route" size={19} /></span> wayline<span className="brand-period">.</span></div>
         <div className="eyebrow section-eyebrow">GOOD TO HAVE YOU HERE</div>
-        <h2 id="auth-title">{mode === "reset-request" ? "Forgot your password?" : mode === "reset-confirm" ? "Choose a new password." : mode === "login" ? "Welcome back." : "Find your way in."}</h2>
-        <p className="auth-subtitle">{mode === "reset-request" ? "Enter the email address on your account and we’ll send reset instructions." : mode === "reset-confirm" ? "Set a new password to get back to your Wayline account." : mode === "login" ? "Your next good connection is just around the corner." : "Join a community that makes every journey count."}</p>
-        {(mode === "login" || mode === "register") && <div className="auth-tabs"><button className={mode === "login" ? "selected" : ""} onClick={() => { setMode("login"); setError(""); }}>Log in</button><button className={mode === "register" ? "selected" : ""} onClick={() => { setMode("register"); setError(""); }}>Create account</button></div>}
-        <form className="auth-form" onSubmit={submit}>
-          {mode === "register" && <label>Your name<input autoComplete="name" required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="What should we call you?" /></label>}
-          {(mode === "login" || mode === "register" || mode === "reset-request") && <label>Email address<input type="email" autoComplete="email" required value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} placeholder="you@example.com" /></label>}
-          {(mode === "login" || mode === "register" || mode === "reset-confirm") && <label>{mode === "reset-confirm" ? "New password" : "Password"}<input type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} required minLength={8} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder="At least 8 characters" /></label>}
-          {mode === "register" && <label className="terms-field"><input type="checkbox" checked={form.termsAccepted} onChange={(event) => setForm({ ...form, termsAccepted: event.target.checked })} required /><span>I agree to the terms and understand how Wayline works.</span></label>}
-          {error && <div className="form-error" role="alert">{error}</div>}
-          <button className="dialog-primary auth-submit" disabled={busy}>{busy ? "One moment..." : mode === "reset-request" ? "Send reset instructions" : mode === "reset-confirm" ? "Update password" : mode === "login" ? "Log in to Wayline" : "Create my account"}<Icon name="arrow" size={17} /></button>
-        </form>
-        {mode === "login" && <button className="forgot-password" onClick={() => { setMode("reset-request"); setError(""); }}>Forgot your password?</button>}
-        {(mode === "login" || mode === "register") && <><div className="auth-separator"><span />or continue with<span /></div><div className="google-button-container" ref={setGoogleElement} /><p className="privacy-note">Your details stay yours. We’re here to help people connect.</p></>}
-        {(mode === "reset-request" || mode === "reset-confirm") && <button className="forgot-password back-to-login" onClick={() => { setMode("login"); setError(""); }}>Back to log in</button>}
+        <h2 id="auth-title">Welcome to Wayline.</h2>
+        <p className="auth-subtitle">Create an account or sign in securely with your Google account.</p>
+        {error && <div className="form-error" role="alert">{error}</div>}
+        {busy && <p className="auth-subtitle" role="status">Signing in...</p>}
+        <div className="google-button-container" ref={setGoogleElement} />
+        <p className="privacy-note">Your details stay yours. We’re here to help people connect.</p>
       </section>
     </div>
     </LocalizedText>

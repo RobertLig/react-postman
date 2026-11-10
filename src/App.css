@@ -222,24 +222,15 @@ h1, h2, h3, p { margin-top: 0; }
 .auth-brand .brand-mark { width: 30px; height: 30px; border-radius: 10px; }
 .auth-dialog h2 { margin: 8px 0 5px; color: #20394c; font: 700 27px "Manrope", sans-serif; letter-spacing: -1.1px; }
 .auth-subtitle { margin-bottom: 18px; color: #7e8b94; font-size: 11px; line-height: 1.6; }
-.auth-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 18px; padding: 4px; border-radius: 9px; background: #f1f5f6; }
-.auth-tabs button { padding: 9px; border: 0; border-radius: 7px; color: #78868f; background: transparent; cursor: pointer; font-size: 11px; font-weight: 600; }
-.auth-tabs button.selected { color: #2b4658; background: #fff; box-shadow: 0 1px 5px rgba(41,61,73,.1); }
-.auth-form { display: grid; gap: 12px; }
-.auth-form > label:not(.terms-field), .post-form label:not(.terms-field) { display: grid; gap: 6px; color: #455e6e; font-size: 10px; font-weight: 700; }
-.auth-form input:not([type="checkbox"]), .post-form input, .post-form textarea { width: 100%; min-height: 42px; padding: 0 12px; border: 1px solid #dfe7e9; border-radius: 7px; outline: 0; color: #253e50; background: #fff; font-size: 11px; font-weight: 400; transition: border .15s, box-shadow .15s; }
-.auth-form input:focus, .post-form input:focus, .post-form textarea:focus { border-color: #8bbdc5; box-shadow: 0 0 0 3px rgba(91,151,162,.1); }
-.auth-form input::placeholder, .post-form input::placeholder, .post-form textarea::placeholder { color: #abb5ba; }
+.post-form label:not(.terms-field) { display: grid; gap: 6px; color: #455e6e; font-size: 10px; font-weight: 700; }
+.post-form input, .post-form textarea { width: 100%; min-height: 42px; padding: 0 12px; border: 1px solid #dfe7e9; border-radius: 7px; outline: 0; color: #253e50; background: #fff; font-size: 11px; font-weight: 400; transition: border .15s, box-shadow .15s; }
+.post-form input:focus, .post-form textarea:focus { border-color: #8bbdc5; box-shadow: 0 0 0 3px rgba(91,151,162,.1); }
+.post-form input::placeholder, .post-form textarea::placeholder { color: #abb5ba; }
 .terms-field { display: flex; align-items: flex-start; gap: 8px; color: #75848c; font-size: 10px; line-height: 1.5; }
 .terms-field input { width: 14px; height: 14px; flex: 0 0 auto; margin: 1px 0 0; accent-color: var(--color-primary); }
-.auth-submit { width: 100%; margin-top: 2px; }
 .form-error { padding: 10px 12px; border: 1px solid #f0d4cb; border-radius: 7px; color: #984b3c; background: #fff7f4; font-size: 10px; line-height: 1.5; }
-.auth-separator { display: flex; align-items: center; gap: 11px; margin: 16px 0 13px; color: #9aa5aa; font-size: 9px; }
-.auth-separator span { height: 1px; flex: 1; background: #e8edef; }
 .google-button-container { min-height: 40px; display: flex; justify-content: center; }
 .privacy-note { margin: 15px 0 0; color: #9ba5a9; text-align: center; font-size: 9px; }
-.forgot-password { align-self: flex-end; margin-top: 11px; padding: 3px 0; border: 0; color: #4a8189; background: transparent; cursor: pointer; font-size: 9px; font-weight: 600; }
-.back-to-login { align-self: center; }
 
 .post-page { max-width: 840px; padding-top: 54px; padding-bottom: 70px; }
 .post-intro { margin-bottom: 29px; }
@@ -586,21 +577,21 @@ h1, h2, h3, p { margin-top: 0; }
   .hero-copy > p, .hero-proof, .section-heading p, .messages-title > p, .route-card-content > p, .route-card-meta, .poster-caption, .bottom-cta p, .site-footer, .detail-description, .detail-facts span, .detail-route small, .detail-schedule small, .detail-stops li, .dialog-footnote, .auth-subtitle, .terms-field, .privacy-note, .post-intro p, .field-hint, .stops-heading p, .profile-identity p, .conversation-meta small, .conversation-empty, .message-placeholder p, .chat-header > div small, .chat-message time, .reaction-bar span, .typing-indicator, .chat-welcome p, .chat-error, .nav-link, .text-button, .art-card small {
     color: var(--ink-soft);
   }
-  .search-field, .filter-field, .search-label, .filter-field > label, .location-field .field-name, .advanced-search-grid > label, .inbox-label, .chat-message p, .profile-form > label, .profile-field-heading label, .announcement-edit-form label, .location-autocomplete label, .location-map-heading, .support-request-form textarea, .post-form label, .auth-form > label:not(.terms-field) {
+  .search-field, .filter-field, .search-label, .filter-field > label, .location-field .field-name, .advanced-search-grid > label, .inbox-label, .chat-message p, .profile-form > label, .profile-field-heading label, .announcement-edit-form label, .location-autocomplete label, .location-map-heading, .support-request-form textarea, .post-form label {
     color: var(--color-base-content);
   }
-  .search-field input, .location-field input, .advanced-search-grid input, .advanced-search-grid select, .announcement-edit-form input, .announcement-edit-form textarea, .auth-form input:not([type="checkbox"]), .post-form input, .post-form textarea, .profile-form input, .profile-form select, .profile-form .react-tel-input .form-control, .chat-compose input, .chat-search input, .support-request-form textarea {
+  .search-field input, .location-field input, .advanced-search-grid input, .advanced-search-grid select, .announcement-edit-form input, .announcement-edit-form textarea, .post-form input, .post-form textarea, .profile-form input, .profile-form select, .profile-form .react-tel-input .form-control, .chat-compose input, .chat-search input, .support-request-form textarea {
     color: var(--color-base-content);
     background-color: var(--color-base-100);
   }
   .hero-art, .route-card-art, .detail-banner, .bottom-cta { background: var(--color-base-300); }
   .route-city { color: var(--color-base-content); }
-  .chat-messages, .conversation-row:hover, .conversation-row.selected, .conversation-row-wrap.selected, .inbox-tabs, .auth-tabs, .auth-tabs button.selected, .conversation-dismiss:hover, .chat-date, .selected-files .selected-photo, .detail-route, .stop-row, .detail-stops li span, .type-option.chosen, .form-error, .inline-error, .location-suggestions button:hover, .location-suggestions button.active, .location-map-help, .profile-form .react-tel-input .flag-dropdown.open, .profile-form .react-tel-input .flag-dropdown:hover, .inbox-label span, .new-support-button, .chat-compose .attach-button {
+  .chat-messages, .conversation-row:hover, .conversation-row.selected, .conversation-row-wrap.selected, .inbox-tabs, .conversation-dismiss:hover, .chat-date, .selected-files .selected-photo, .detail-route, .stop-row, .detail-stops li span, .type-option.chosen, .form-error, .inline-error, .location-suggestions button:hover, .location-suggestions button.active, .location-map-help, .profile-form .react-tel-input .flag-dropdown.open, .profile-form .react-tel-input .flag-dropdown:hover, .inbox-label span, .new-support-button, .chat-compose .attach-button {
     color: var(--color-base-content);
     border-color: var(--line);
     background-color: var(--color-base-300);
   }
-  .inbox-tabs button, .auth-tabs button, .location-suggestions button, .conversation-row, .message-meta button, .block-user-button, .delete-route-button, .remove-stop, .signout-button, .avatar-upload, .avatar-remove {
+  .inbox-tabs button, .location-suggestions button, .conversation-row, .message-meta button, .block-user-button, .delete-route-button, .remove-stop, .signout-button, .avatar-upload, .avatar-remove {
     color: var(--color-base-content);
   }
   .chat-message.mine p { border-color: var(--line); background: color-mix(in oklch, var(--color-primary) 24%, var(--color-base-200)); }

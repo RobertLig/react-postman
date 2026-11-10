@@ -4,12 +4,12 @@ Wayline is a React interface for the Quarkus API in `../quarkus-demo/myapp`.
 It connects people who need a parcel delivered with travelers already heading
 that way and willing to carry it. Members can post an ad looking for a courier
 or offer to deliver a parcel; Wayline is for parcel delivery, not ride-sharing.
-The frontend also supports email and Google sign-in, email verification and
-password reset, browsing/searching delivery ads, route and profile photo
-uploads, route management, direct messages with attachments/reactions/live
-updates, member block controls, and a role-gated support inbox for
-administrators. Profile phone numbers use a country-aware input and are saved
-in international format; the initial country comes from the browser locale.
+The frontend supports Google sign-in and account creation,
+browsing/searching delivery ads, route and profile photo uploads, route
+management, direct messages with attachments/reactions/live updates, member
+block controls, and a role-gated support inbox for administrators. Profile
+phone numbers use a country-aware input and are saved in international format;
+the initial country comes from the browser locale.
 
 ## Run locally
 
@@ -75,11 +75,6 @@ attempt the API refresh-cookie flow once, then return the user to sign-in if
 the refresh cookie is unavailable or invalid. Role-gated controls are only a
 convenience; the Quarkus API remains responsible for authorization.
 
-In dev/test, the API links verification and password-reset emails to
-`http://localhost:3000`. For production, set `FRONTEND_BASE_URL` in the API
-environment to the public frontend origin (for example,
-`https://app.example.com`).
-
 ## Deploy to Cloudflare Pages
 
 Create a Pages project connected to this repository and use:
@@ -100,14 +95,11 @@ routes serve the React app. After the first successful deployment, Cloudflare
 Pages shows the site's public URL, typically
 `https://<project-name>.pages.dev`.
 
-In the Render API service, set `FRONTEND_BASE_URL` to that frontend origin
-(for example, `https://wayline.pages.dev`) so verification and password-reset
-links open the website. Include that origin in `CORS_ORIGINS` so browsers can
-call the API; retain `http://localhost:3000` there too if you still call the
-deployed API from your local frontend. Add the frontend origin to the Google
-OAuth client's authorized JavaScript origins as well. If the Pages URL
-changes, update these origin settings and redeploy the frontend if its API URL
-changes.
+Include the frontend origin in `CORS_ORIGINS` so browsers can call the API;
+retain `http://localhost:3000` there too if you call the deployed API from your
+local frontend. Add the frontend origin to the Google OAuth client's
+authorized JavaScript origins as well. If the Pages URL changes, update these
+origin settings and redeploy the frontend if its API URL changes.
 
 ## Scripts
 
