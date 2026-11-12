@@ -311,6 +311,84 @@ test.each([
   });
 });
 
+test("keeps search results visible when a read receipt arrives", async () => {
+  const token = "message-search-read-receipt-token";
+  const originalWebSocket = window.WebSocket;
+  const sockets = [];
+  const conversation = {
+    id: 90,
+    participants: [{ id: 7, name: "Regular User" }, { id: 88, name: "Support Agent" }],
+  };
+  window.sessionStorage.setItem("wayline.accessToken", token);
+  window.WebSocket = class MockWebSocket {
+    static OPEN = 1;
+    static CONNECTING = 0;
+
+    constructor(url) {
+      this.url = url;
+      this.readyState = MockWebSocket.CONNECTING;
+      sockets.push(this);
+    }
+
+    close() {
+      this.readyState = 3;
+    }
+  };
+  window.fetch.mockImplementation(async (input, options = {}) => {
+    const url = new URL(String(input));
+    const result = url.pathname === "/users/me"
+      ? { id: 7, name: "Regular User", role: "USER" }
+      : url.pathname === "/conversations/list"
+        ? [conversation]
+        : url.pathname === "/conversations/90/messages"
+          ? {
+            messages: [
+              { id: 91, senderId: 88, content: "Unrelated earlier message", createdAt: "2026-10-28T10:00:00Z" },
+              { id: 92, senderId: 88, content: "Found search result", createdAt: "2026-10-28T10:01:00Z" },
+            ],
+            hasMore: false,
+          }
+          : url.pathname === "/conversations/90/search"
+            ? {
+              messages: [
+                { id: 92, senderId: 88, content: "Found search result", createdAt: "2026-10-28T10:01:00Z" },
+              ],
+              hasMore: false,
+            }
+            : {};
+    return { ok: true, text: async () => JSON.stringify(result) };
+  });
+
+  try {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: /^Messages/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Support Agent.*Open conversation/ }));
+    expect(await screen.findByText("Unrelated earlier message")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Search this conversation" }), {
+      target: { value: "search result" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Search messages" }));
+    expect(await screen.findByText("Found search result")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("Unrelated earlier message")).not.toBeInTheDocument());
+    await waitFor(() => expect(sockets.some((socket) => new URL(socket.url).pathname === "/ws/chat/90")).toBe(true));
+
+    act(() => {
+      sockets.find((socket) => new URL(socket.url).pathname === "/ws/chat/90").onmessage({
+        data: JSON.stringify({ event: "READ", conversationId: 90, messageId: 92, userId: 88 }),
+      });
+    });
+
+    await new Promise((resolve) => window.setTimeout(resolve, 150));
+    expect(screen.getByText("Found search result")).toBeInTheDocument();
+    expect(screen.queryByText("Unrelated earlier message")).not.toBeInTheDocument();
+    expect(window.fetch.mock.calls.filter(([input]) =>
+      new URL(String(input)).pathname === "/conversations/90/messages")).toHaveLength(1);
+  } finally {
+    window.WebSocket = originalWebSocket;
+  }
+});
+
 test.each([
   {
     role: "USER",

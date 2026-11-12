@@ -2208,7 +2208,7 @@ function ConversationPanel({
               content: payload.content,
               createdAt: payload.createdAt,
             });
-          } else if (["REACTION", "ATTACHMENT", "DELETED", "READ", "DELIVERED"].includes(payload.event)) {
+          } else if (["REACTION", "ATTACHMENT", "DELETED"].includes(payload.event)) {
             window.clearTimeout(refreshTimer);
             refreshTimer = window.setTimeout(() => socketCallbacks.current.onRefreshMessages(), 100);
           }
